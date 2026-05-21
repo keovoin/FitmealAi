@@ -1,0 +1,695 @@
+{
+  "project": {
+    "app_name": "VitaGlass AI",
+    "platform": "iOS",
+    "device_frame": "iPhone 15 Pro",
+    "frame_size": {
+      "width": 393,
+      "height": 852
+    },
+    "product_type": "AI meal planner, workout planner, habit tracker, and progress coach",
+    "design_goal": "Create a premium iOS glassmorphism health and fitness app with simple UX, daily engagement, and clear plan upgrade flow.",
+    "target_users": [
+      "busy professionals",
+      "beginners starting fitness",
+      "users who want simple meal planning",
+      "users who want home workout plans",
+      "users who prefer lightweight habit tracking"
+    ]
+  },
+  "visual_style": {
+    "overall_style": "Apple-inspired glassmorphism, premium, minimal, calm, modern",
+    "mood": [
+      "clean",
+      "healthy",
+      "friendly",
+      "motivational",
+      "premium"
+    ],
+    "background": {
+      "type": "dark gradient",
+      "colors": [
+        "#0F172A",
+        "#1E3A8A",
+        "#7C3AED"
+      ],
+      "direction": "top left to bottom right",
+      "decorative_blobs": true,
+      "blob_opacity": 0.25,
+      "blob_blur": 80
+    },
+    "glass_card": {
+      "fill": "rgba(255,255,255,0.10)",
+      "stroke": "rgba(255,255,255,0.20)",
+      "background_blur": 30,
+      "corner_radius": 24,
+      "shadow": "0 12 32 rgba(0,0,0,0.18)"
+    },
+    "primary_gradient": {
+      "colors": [
+        "#4F8CFF",
+        "#8F5CFF"
+      ]
+    },
+    "success_color": "#34D399",
+    "warning_color": "#FBBF24",
+    "danger_color": "#FB7185",
+    "text_colors": {
+      "primary": "#FFFFFF",
+      "secondary": "rgba(255,255,255,0.72)",
+      "tertiary": "rgba(255,255,255,0.45)"
+    }
+  },
+  "typography": {
+    "font_family": "SF Pro Display or iOS system font",
+    "styles": [
+      {
+        "name": "Large Title",
+        "size": 34,
+        "weight": "Bold",
+        "line_height": 40
+      },
+      {
+        "name": "Title",
+        "size": 24,
+        "weight": "Bold",
+        "line_height": 30
+      },
+      {
+        "name": "Headline",
+        "size": 18,
+        "weight": "Semibold",
+        "line_height": 24
+      },
+      {
+        "name": "Body",
+        "size": 16,
+        "weight": "Regular",
+        "line_height": 22
+      },
+      {
+        "name": "Caption",
+        "size": 13,
+        "weight": "Regular",
+        "line_height": 18
+      }
+    ]
+  },
+  "layout_rules": {
+    "safe_area": true,
+    "screen_padding": 20,
+    "card_padding": 18,
+    "vertical_spacing": 16,
+    "minimum_touch_target": 44,
+    "use_auto_layout": true,
+    "responsive_constraints": "Pin main containers left and right with flexible height. Bottom tab should be fixed to bottom safe area.",
+    "navigation": {
+      "type": "bottom tab navigation",
+      "tabs": [
+        "Home",
+        "Meals",
+        "Workout",
+        "Progress",
+        "Settings"
+      ],
+      "style": "floating glass tab bar",
+      "icon_style": "SF Symbols inspired line icons"
+    }
+  },
+  "subscription_model": {
+    "plans": [
+      {
+        "name": "Free",
+        "price": "$0",
+        "features": [
+          "1 AI plan regeneration per day",
+          "basic daily meal plan",
+          "basic daily workout",
+          "3 habit items"
+        ],
+        "limitations": [
+          "no weekly plan",
+          "no advanced progress analytics",
+          "limited AI regeneration"
+        ]
+      },
+      {
+        "name": "Silver",
+        "price": "$2.99/month",
+        "features": [
+          "daily meal plan",
+          "daily workout plan",
+          "habit tracker",
+          "7-day meal and workout plan",
+          "10 AI regenerations per day"
+        ]
+      },
+      {
+        "name": "Gold",
+        "price": "$4.99/month",
+        "features": [
+          "unlimited AI planning",
+          "advanced progress insights",
+          "meal replacement suggestions",
+          "custom workout goal",
+          "premium glass themes",
+          "priority plan generation"
+        ],
+        "highlight": true
+      }
+    ],
+    "payment_methods": [
+      {
+        "name": "StoreKit 2 Subscription",
+        "recommended": true,
+        "use_case": "main subscription purchase inside iOS app"
+      },
+      {
+        "name": "ABA Manual Payment",
+        "recommended": false,
+        "use_case": "manual payment request and developer approval flow where allowed"
+      }
+    ],
+    "important_note": "For digital subscriptions inside an iOS app, prioritize StoreKit 2 because Apple requires in-app purchase for many digital goods and services. Manual payment should be treated carefully and may be used only where policy and distribution model allow."
+  },
+  "components": [
+    {
+      "name": "GlassCard",
+      "variants": [
+        "default",
+        "pressed",
+        "highlighted",
+        "loading",
+        "disabled"
+      ],
+      "properties": {
+        "corner_radius": 24,
+        "padding": 18,
+        "background_blur": 30,
+        "stroke": "white 20%",
+        "fill": "white 10%"
+      }
+    },
+    {
+      "name": "PrimaryButton",
+      "variants": [
+        "default",
+        "pressed",
+        "loading",
+        "disabled"
+      ],
+      "properties": {
+        "height": 52,
+        "corner_radius": 16,
+        "fill": "blue-purple gradient",
+        "text_weight": "Semibold"
+      }
+    },
+    {
+      "name": "SecondaryGlassButton",
+      "variants": [
+        "default",
+        "pressed",
+        "disabled"
+      ],
+      "properties": {
+        "height": 48,
+        "corner_radius": 16,
+        "fill": "white 10%",
+        "stroke": "white 20%"
+      }
+    },
+    {
+      "name": "SegmentedControl",
+      "variants": [
+        "three_options",
+        "selected",
+        "unselected"
+      ],
+      "options_examples": [
+        "Lose Weight",
+        "Maintain",
+        "Gain Muscle"
+      ]
+    },
+    {
+      "name": "MetricRing",
+      "variants": [
+        "calories",
+        "workout",
+        "habits"
+      ],
+      "properties": {
+        "style": "circular progress ring",
+        "stroke_width": 10,
+        "gradient": "blue-purple"
+      }
+    },
+    {
+      "name": "MealCard",
+      "content": [
+        "meal type",
+        "meal name",
+        "calories",
+        "macro summary",
+        "replace button"
+      ]
+    },
+    {
+      "name": "WorkoutExerciseRow",
+      "content": [
+        "exercise name",
+        "sets",
+        "reps or duration",
+        "completion checkbox"
+      ]
+    },
+    {
+      "name": "HabitRow",
+      "content": [
+        "habit icon",
+        "habit name",
+        "progress value",
+        "checkbox"
+      ]
+    },
+    {
+      "name": "PlanCard",
+      "variants": [
+        "free",
+        "silver",
+        "gold_highlighted"
+      ],
+      "content": [
+        "plan name",
+        "price",
+        "features",
+        "CTA button"
+      ]
+    },
+    {
+      "name": "PaymentStatusBadge",
+      "variants": [
+        "pending",
+        "approved",
+        "rejected"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "name": "01 Splash",
+      "purpose": "Create premium first impression",
+      "layout": "centered logo and app name on gradient background",
+      "elements": [
+        "VitaGlass AI logo mark",
+        "app name",
+        "tagline: Meal. Move. Improve.",
+        "subtle glass glow"
+      ],
+      "animation": {
+        "logo": "scale 0.9 to 1.0 with opacity 0 to 1",
+        "duration": "0.6s",
+        "easing": "ease out"
+      }
+    },
+    {
+      "name": "02 Onboarding Goal",
+      "purpose": "Collect user's main health goal quickly",
+      "layout": "one centered glass card",
+      "elements": [
+        "title: What is your goal?",
+        "subtitle: We will create your meal and workout plan around it.",
+        "segmented control with Lose Weight, Maintain, Gain Muscle",
+        "calorie target slider from 1400 to 3200",
+        "activity level selector: Beginner, Active, Athlete",
+        "Continue button"
+      ],
+      "ux_notes": [
+        "Do not ask too many questions",
+        "Use tap choices instead of text fields",
+        "Make the selected option visually bright"
+      ]
+    },
+    {
+      "name": "03 Onboarding Diet",
+      "purpose": "Personalize meal plan",
+      "layout": "glass card with selectable chips",
+      "elements": [
+        "title: Choose your food style",
+        "diet chips: Balanced, High Protein, Low Carb, Vegetarian, Budget Meal",
+        "allergy input field",
+        "meals per day selector: 3 meals, 4 meals, 5 meals",
+        "Continue button"
+      ],
+      "states": [
+        "selected chip",
+        "empty allergy",
+        "filled allergy"
+      ]
+    },
+    {
+      "name": "04 Home Dashboard",
+      "purpose": "Show today's entire plan at a glance",
+      "layout": "vertical scroll with floating bottom tab",
+      "elements": [
+        "greeting: Good Morning, Chyvoin",
+        "date and motivational subtitle",
+        "calorie metric ring card showing 1850 kcal target",
+        "Today Meal Plan card with breakfast lunch dinner summary",
+        "Workout card showing Full Body 30 min",
+        "Habit card with Drink Water, Walk 5000 Steps, Sleep 8h",
+        "Regenerate AI Plan primary button",
+        "small Upgrade to Gold glass banner if user is Free"
+      ],
+      "animation": {
+        "on_load": "stagger cards upward from y=30 to y=0 and opacity 0 to 1",
+        "button_tap": "scale 1.0 to 0.96 then back to 1.0"
+      }
+    },
+    {
+      "name": "05 AI Generating State",
+      "purpose": "Show premium loading experience while AI creates plan",
+      "layout": "same as dashboard but cards replaced with skeleton glass placeholders",
+      "elements": [
+        "text: Creating your perfect plan...",
+        "shimmer loading cards",
+        "small progress dots",
+        "cancel button as secondary glass button"
+      ],
+      "animation": {
+        "shimmer": "linear gradient moves left to right every 1.2s looping",
+        "content": "old content blurs and fades out, skeleton fades in"
+      }
+    },
+    {
+      "name": "06 Meal Plan",
+      "purpose": "Let user view and modify daily meals",
+      "layout": "vertical list with day tabs",
+      "elements": [
+        "header: Meal Plan",
+        "tabs: Today, Tomorrow, Weekly",
+        "Breakfast MealCard",
+        "Lunch MealCard",
+        "Dinner MealCard",
+        "daily nutrition summary card",
+        "Replace Meal secondary button inside each meal card"
+      ],
+      "states": [
+        "normal",
+        "replacing meal loading",
+        "empty meal plan",
+        "locked weekly plan for Free user"
+      ],
+      "animation": {
+        "tab_switch": "fade and slide x=12",
+        "replace_meal": "meal card flips or crossfades into new meal"
+      }
+    },
+    {
+      "name": "07 Workout",
+      "purpose": "Guide user through simple workout",
+      "layout": "single workout focus card and exercise list",
+      "elements": [
+        "header: Workout",
+        "workout title: Full Body - 30 min",
+        "difficulty badge: Beginner",
+        "exercise rows: Push-ups, Squats, Plank, Lunges",
+        "Start Timer primary button",
+        "completion progress bar",
+        "Finish Workout button"
+      ],
+      "states": [
+        "not started",
+        "timer active",
+        "exercise completed",
+        "workout finished"
+      ],
+      "animation": {
+        "timer": "circular timer countdown",
+        "completed_exercise": "checkbox pop animation with green glow"
+      }
+    },
+    {
+      "name": "08 Habits",
+      "purpose": "Track simple daily health habits",
+      "layout": "checklist cards",
+      "elements": [
+        "header: Habits",
+        "habit rows: Drink Water, Walk 5000 Steps, Sleep 8h, Stretch 5 min",
+        "Add Habit button",
+        "daily streak card"
+      ],
+      "states": [
+        "habit unchecked",
+        "habit checked",
+        "habit completed all",
+        "empty custom habits"
+      ],
+      "animation": {
+        "check": "small bounce scale 0.8 to 1.15 to 1.0",
+        "streak": "soft glow when all habits completed"
+      }
+    },
+    {
+      "name": "09 Progress",
+      "purpose": "Show progress without overwhelming user",
+      "layout": "metric cards and simple charts",
+      "elements": [
+        "header: Progress",
+        "weight trend line chart glass card",
+        "weekly completion rate card",
+        "average calories card",
+        "workout consistency card",
+        "insight text card: You completed 5 of 7 days this week"
+      ],
+      "states": [
+        "with enough data",
+        "not enough data",
+        "Gold locked advanced analytics"
+      ],
+      "animation": {
+        "charts": "draw line chart from left to right",
+        "metric_cards": "count up numbers"
+      }
+    },
+    {
+      "name": "10 Paywall",
+      "purpose": "Upgrade user clearly to Silver or Gold",
+      "layout": "stacked plan cards with Gold highlighted",
+      "elements": [
+        "header: Upgrade Your Plan",
+        "subtitle: Get smarter meal and workout planning.",
+        "Free comparison row",
+        "Silver plan card $2.99/month",
+        "Gold plan card $4.99/month with Best Value badge",
+        "feature comparison bullets",
+        "Continue with StoreKit button",
+        "Alternative manual ABA payment link",
+        "Restore Purchase button",
+        "Terms and Privacy links"
+      ],
+      "animation": {
+        "gold_card": "premium glow pulse every 2s",
+        "plan_select": "selected card slightly scales up and border becomes brighter"
+      },
+      "important_ux": [
+        "Show price clearly",
+        "Show plan duration clearly",
+        "Do not hide restore purchase",
+        "Keep Terms and Privacy visible"
+      ]
+    },
+    {
+      "name": "11 ABA Payment QR",
+      "purpose": "Manual ABA payment submission flow",
+      "layout": "QR card and form",
+      "elements": [
+        "header: ABA Payment",
+        "selected plan summary",
+        "QR code placeholder card",
+        "merchant name",
+        "merchant ID placeholder",
+        "instruction text: Scan this QR with ABA app, then submit transaction ID.",
+        "transaction ID input",
+        "upload screenshot button",
+        "Submit for Approval button"
+      ],
+      "states": [
+        "empty transaction ID",
+        "screenshot uploaded",
+        "submitting",
+        "submitted pending approval"
+      ],
+      "animation": {
+        "qr_card": "soft breathing glow",
+        "submit": "loading spinner inside button"
+      }
+    },
+    {
+      "name": "12 Payment Pending",
+      "purpose": "Show user manual payment is waiting for developer approval",
+      "layout": "centered glass status card",
+      "elements": [
+        "status icon clock",
+        "title: Payment Under Review",
+        "subtitle: We will activate your plan after verification.",
+        "status badge: Pending",
+        "Back to Home button"
+      ]
+    },
+    {
+      "name": "13 Settings",
+      "purpose": "User account and app control",
+      "layout": "sectioned glass list",
+      "elements": [
+        "profile card",
+        "current plan row",
+        "manage subscription row",
+        "restore purchase row",
+        "payment history row",
+        "diet preferences row",
+        "workout preferences row",
+        "support row",
+        "privacy policy row",
+        "terms of use row"
+      ]
+    }
+  ],
+  "prototype_flow": [
+    {
+      "from": "01 Splash",
+      "to": "02 Onboarding Goal",
+      "trigger": "after delay 1s",
+      "animation": "smart animate fade"
+    },
+    {
+      "from": "02 Onboarding Goal",
+      "to": "03 Onboarding Diet",
+      "trigger": "tap Continue",
+      "animation": "slide left 0.35s"
+    },
+    {
+      "from": "03 Onboarding Diet",
+      "to": "04 Home Dashboard",
+      "trigger": "tap Continue",
+      "animation": "slide left 0.35s"
+    },
+    {
+      "from": "04 Home Dashboard",
+      "to": "05 AI Generating State",
+      "trigger": "tap Regenerate AI Plan",
+      "animation": "smart animate 0.3s"
+    },
+    {
+      "from": "05 AI Generating State",
+      "to": "04 Home Dashboard",
+      "trigger": "after delay 2s",
+      "animation": "smart animate 0.4s"
+    },
+    {
+      "from": "04 Home Dashboard",
+      "to": "06 Meal Plan",
+      "trigger": "tap Meals tab",
+      "animation": "fade and slide 0.25s"
+    },
+    {
+      "from": "04 Home Dashboard",
+      "to": "07 Workout",
+      "trigger": "tap Workout tab",
+      "animation": "fade and slide 0.25s"
+    },
+    {
+      "from": "04 Home Dashboard",
+      "to": "09 Progress",
+      "trigger": "tap Progress tab",
+      "animation": "fade and slide 0.25s"
+    },
+    {
+      "from": "04 Home Dashboard",
+      "to": "10 Paywall",
+      "trigger": "tap Upgrade banner",
+      "animation": "modal slide up 0.35s"
+    },
+    {
+      "from": "10 Paywall",
+      "to": "11 ABA Payment QR",
+      "trigger": "tap Alternative ABA payment",
+      "animation": "slide left 0.35s"
+    },
+    {
+      "from": "11 ABA Payment QR",
+      "to": "12 Payment Pending",
+      "trigger": "tap Submit for Approval",
+      "animation": "smart animate 0.4s"
+    }
+  ],
+  "empty_loading_error_states": {
+    "empty_meal_plan": {
+      "message": "No meal plan yet.",
+      "cta": "Generate Meal Plan"
+    },
+    "empty_workout": {
+      "message": "No workout created yet.",
+      "cta": "Create Workout"
+    },
+    "ai_error": {
+      "message": "We could not generate your plan. Please try again.",
+      "cta": "Retry"
+    },
+    "payment_rejected": {
+      "message": "Payment could not be verified.",
+      "cta": "Resubmit Payment"
+    },
+    "network_error": {
+      "message": "Connection issue. Please check your internet.",
+      "cta": "Try Again"
+    }
+  },
+  "accessibility": {
+    "minimum_contrast": "AA",
+    "dynamic_type": true,
+    "large_touch_targets": true,
+    "avoid_color_only_status": true,
+    "status_labels": [
+      "Pending",
+      "Approved",
+      "Rejected",
+      "Locked",
+      "Completed"
+    ]
+  },
+  "developer_handoff_notes": {
+    "ios_framework": "SwiftUI",
+    "glass_implementation": "Use .ultraThinMaterial, RoundedRectangle cornerRadius 24, overlay stroke white opacity 0.2",
+    "animations": "Use withAnimation(.spring()) for taps and .easeInOut(duration: 0.35) for transitions",
+    "storekit_products": [
+      "vitaglass_silver_monthly",
+      "vitaglass_gold_monthly"
+    ],
+    "manual_payment_statuses": [
+      "pending",
+      "approved",
+      "rejected"
+    ],
+    "backend_collections": [
+      "users",
+      "plans",
+      "mealPlans",
+      "workoutPlans",
+      "habits",
+      "paymentRequests"
+    ]
+  },
+  "output_requirements": [
+    "Generate all screens as separate iPhone 15 Pro frames.",
+    "Create reusable Figma components with variants.",
+    "Use auto-layout on all cards, lists, and buttons.",
+    "Add prototype links according to the prototype_flow.",
+    "Create interactive variants for button pressed, loading, and disabled states.",
+    "Create a premium Gold plan highlight treatment.",
+    "Use realistic sample data.",
+    "Keep the UI clean and not crowded.",
+    "Make the app feel native to iOS."
+  ]
+}
