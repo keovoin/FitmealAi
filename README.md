@@ -9,6 +9,7 @@ This is a **monorepo** with three loosely-coupled folders:
 | Folder | What it is | How to run |
 |---|---|---|
 | [`FitMealAI/`](./FitMealAI/) | iOS SwiftUI app (the production product) | Xcode 15+, iOS 17+. See [FitMealAI/README.md](./FitMealAI/README.md). |
+| [`android/`](./android/) | Android A1 foundation (Kotlin + Jetpack Compose) | Open in Android Studio. See [android/README.md](./android/README.md). |
 | [`admin-web/`](./admin-web/) | Next.js 15 admin CMS (internal-only web UI) | `cd admin-web && npm install && npm run dev`. See [admin-web/README.md](./admin-web/README.md). |
 | [`supabase/`](./supabase/) | SQL migrations for Postgres + Storage policies | Apply via Supabase SQL Editor. See [supabase/README.md](./supabase/README.md). |
 | `src/` (legacy) | React/Vite Figma Make export. Visual reference only. | `npm install && npm run dev`. Frozen — not the production app. |
@@ -18,6 +19,7 @@ This is a **monorepo** with three loosely-coupled folders:
 To keep the iOS work safe from accidental overwrites, these paths are owned by specific workstreams:
 
 - `FitMealAI/` and `.kiro/` — iOS workstream (Swift, MVVM, iOS 17+)
+- `android/` — Android workstream (Kotlin, Jetpack Compose)
 - `admin-web/` — admin CMS workstream (Next.js, Tailwind, TypeScript)
 - `src/` — paused Figma Make export, design reference only
 
@@ -39,3 +41,4 @@ To keep the iOS work safe from accidental overwrites, these paths are owned by s
 - **Phase 4d** — Real iOS navigation shell and app flow. Done.
 - **Phase 4e** — Animation polish. Next.
 - **Phase 5** — Preview and QA, then Android planning/port (Jetpack Compose, reusing the same domain shapes).
+- **Android A1** — Compose project shell, theme, models, mock data, and starter flow. Done.

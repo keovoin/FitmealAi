@@ -2,7 +2,7 @@
 
 ## Recommended timing
 
-Do Android after **Phase 5 iOS Preview + QA**. The iOS app now has real auth, API, and navigation contracts, but Android should not start until Xcode/simulator QA confirms the shared product flow is stable.
+Android A1 has now started. Continue cautiously: the iOS app still needs **Phase 5 Preview + QA**, and Android integrations should wait until Xcode/simulator QA confirms the shared product flow is stable.
 
 ## Android architecture
 
@@ -22,9 +22,10 @@ Do Android after **Phase 5 iOS Preview + QA**. The iOS app now has real auth, AP
 ## Android phases
 
 ### A1 — Foundation
-- Create Android project shell.
-- Port theme tokens, typography, glass cards, bottom navigation.
-- Port domain models and mock data.
+- [x] Create Android project shell.
+- [x] Port theme tokens, glass cards, primary button, bottom navigation foundation.
+- [x] Port domain models and mock data.
+- [x] Add starter splash → login → onboarding → main shell flow.
 
 ### A2 — Core screens
 - Login, onboarding goal/workout/meal, home dashboard, meals, workout, habits, progress, settings.
@@ -43,6 +44,6 @@ Do Android after **Phase 5 iOS Preview + QA**. The iOS app now has real auth, AP
 - Offline/error states.
 - Auth/session regression tests.
 
-## Best next step before Android
+## Best next step
 
-Finish **Phase 5 iOS QA** first, then start Android A1 once the API and screen flow are proven on iOS.
+Finish **Phase 5 iOS QA** in parallel before Android A3 integrations. The next Android coding step is **A2 Core Screens**.
