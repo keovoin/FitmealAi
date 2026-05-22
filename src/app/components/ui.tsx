@@ -81,7 +81,9 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
   );
 }
 
+let _ringId = 0;
 export function MetricRing({ value, max, size = 100, strokeWidth = 10, label, sublabel }: { value: number, max: number, size?: number, strokeWidth?: number, label: string, sublabel?: string }) {
+  const [gradId] = React.useState(() => `ring-grad-${++_ringId}`);
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const progress = Math.min(value / max, 1);
@@ -90,6 +92,12 @@ export function MetricRing({ value, max, size = 100, strokeWidth = 10, label, su
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       <svg className="transform -rotate-90 w-full h-full">
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#4F8CFF" />
+            <stop offset="100%" stopColor="#8F5CFF" />
+          </linearGradient>
+        </defs>
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -102,7 +110,7 @@ export function MetricRing({ value, max, size = 100, strokeWidth = 10, label, su
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="url(#gradient)"
+          stroke={`url(#${gradId})`}
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
@@ -112,12 +120,6 @@ export function MetricRing({ value, max, size = 100, strokeWidth = 10, label, su
             transition: 'stroke-dashoffset 1s ease-in-out'
           }}
         />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#4F8CFF" />
-            <stop offset="100%" stopColor="#8F5CFF" />
-          </linearGradient>
-        </defs>
       </svg>
       <div className="absolute flex flex-col items-center justify-center text-center">
         <span className="text-xl font-bold text-white leading-none">{label}</span>

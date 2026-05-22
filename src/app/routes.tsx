@@ -1,9 +1,12 @@
 import { createBrowserRouter, Outlet } from "react-router";
 import { Splash } from "./screens/Splash";
+import { Login } from "./screens/Login";
 import { OnboardingGoal } from "./screens/OnboardingGoal";
 import { OnboardingWorkout } from "./screens/OnboardingWorkout";
 import { OnboardingMeal } from "./screens/OnboardingMeal";
 import { OnboardingDiet } from "./screens/OnboardingDiet";
+import { SettingsWorkout } from "./screens/SettingsWorkout";
+import { SettingsMeal } from "./screens/SettingsMeal";
 import { HomeDashboard } from "./screens/HomeDashboard";
 import { AIGenerating } from "./screens/AIGenerating";
 import { MealPlan } from "./screens/MealPlan";
@@ -43,10 +46,13 @@ export const router = createBrowserRouter([
     element: <PlainLayout />,
     children: [
       { index: true, element: <Splash /> },
+      { path: "login", element: <Login /> },
       { path: "onboarding/goal", element: <OnboardingGoal /> },
       { path: "onboarding/workout", element: <OnboardingWorkout /> },
       { path: "onboarding/meal", element: <OnboardingMeal /> },
       { path: "onboarding/diet", element: <OnboardingDiet /> },
+      { path: "settings/workout", element: <SettingsWorkout /> },
+      { path: "settings/meal", element: <SettingsMeal /> },
       { path: "generating", element: <AIGenerating /> },
       { path: "paywall", element: <Paywall /> },
       { path: "payment/aba", element: <ABAPayment /> },

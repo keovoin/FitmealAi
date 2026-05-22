@@ -2,9 +2,15 @@ import { motion } from "motion/react";
 import { GlassCard } from "../components/ui";
 import { ChevronRight, User, CreditCard, ShieldCheck, Heart, Dumbbell, LifeBuoy, FileText, LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
+import { getWorkoutPrefs, getMealPrefs } from "../store/preferences";
 
 export function Settings() {
   const navigate = useNavigate();
+  const workoutPrefs = getWorkoutPrefs();
+  const mealPrefs = getMealPrefs();
+
+  const workoutSummary = `${workoutPrefs.types.length} type${workoutPrefs.types.length !== 1 ? "s" : ""} · ${workoutPrefs.days}`;
+  const mealSummary = `${mealPrefs.diets.length} diet${mealPrefs.diets.length !== 1 ? "s" : ""} · ${mealPrefs.timings.length} meals`;
 
   const sections = [
     {
@@ -18,8 +24,8 @@ export function Settings() {
     {
       title: "Preferences",
       items: [
-        { icon: Heart, label: "Diet Preferences" },
-        { icon: Dumbbell, label: "Workout Settings" },
+        { icon: Heart, label: "Diet Preferences", value: mealSummary, onClick: () => navigate("/settings/meal") },
+        { icon: Dumbbell, label: "Workout Settings", value: workoutSummary, onClick: () => navigate("/settings/workout") },
       ]
     },
     {
@@ -72,10 +78,15 @@ export function Settings() {
                       <div className="w-8 h-8 rounded-full bg-white/5 text-white/70 flex items-center justify-center shrink-0">
                         <Icon size={16} />
                       </div>
-                      <span className="font-medium text-[15px]">{item.label}</span>
+                      <div>
+                        <div className="font-medium text-[15px]">{item.label}</div>
+                        {item.value && !item.highlight && (
+                          <div className="text-xs text-white/40 mt-0.5">{item.value}</div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-white/50">
-                      {item.value && <span className={item.highlight ? "text-amber-400 font-bold" : ""}>{item.value}</span>}
+                      {item.value && item.highlight && <span className="text-amber-400 font-bold">{item.value}</span>}
                       <ChevronRight size={16} />
                     </div>
                   </div>

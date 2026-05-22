@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { GlassCard, PrimaryButton } from "../components/ui";
+import { ArrowLeft, Check } from "lucide-react";
 import { getMealPrefs, saveMealPrefs } from "../store/preferences";
 
 const DIET_TYPES = [
@@ -27,41 +28,15 @@ const MEAL_TIMINGS = [
 const COOK_TIMES = ["< 15 min", "30 min", "45 min", "1 hr+"];
 const ALLERGY_TAGS = ["Peanuts", "Tree Nuts", "Gluten", "Dairy", "Eggs", "Shellfish", "Soy", "Fish"];
 
-const STEP_LABELS = ["Goal", "Workout", "Meal"];
-
-function StepIndicator({ current }: { current: number }) {
-  return (
-    <div className="flex items-center justify-center gap-2 mb-8">
-      {STEP_LABELS.map((label, i) => (
-        <div key={label} className="flex items-center gap-2">
-          <div className="flex flex-col items-center gap-1">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-              i < current
-                ? "bg-[#8F5CFF] text-white"
-                : i === current
-                ? "bg-gradient-to-br from-[#8F5CFF] to-[#4F8CFF] text-white shadow-[0_0_12px_rgba(143,92,255,0.5)]"
-                : "bg-white/10 text-white/40"
-            }`}>
-              {i < current ? "✓" : i + 1}
-            </div>
-            <span className={`text-[10px] font-medium ${i === current ? "text-white" : "text-white/40"}`}>{label}</span>
-          </div>
-          {i < STEP_LABELS.length - 1 && (
-            <div className={`w-8 h-px mb-4 transition-all duration-300 ${i < current ? "bg-[#8F5CFF]" : "bg-white/15"}`} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function OnboardingMeal() {
+export function SettingsMeal() {
   const navigate = useNavigate();
   const saved = getMealPrefs();
+
   const [selectedDiets, setSelectedDiets] = useState<string[]>(saved.diets);
   const [selectedTimings, setSelectedTimings] = useState<string[]>(saved.timings);
   const [cookTime, setCookTime] = useState(saved.cookTime);
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>(saved.allergies);
+  const [saved_, setSaved_] = useState(false);
 
   function toggleDiet(id: string) {
     setSelectedDiets((prev) =>
@@ -85,22 +60,35 @@ export function OnboardingMeal() {
     );
   }
 
+  function handleSave() {
+    saveMealPrefs({ diets: selectedDiets, timings: selectedTimings, cookTime, allergies: selectedAllergies });
+    setSaved_(true);
+    setTimeout(() => setSaved_(false), 2000);
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="flex-1 flex flex-col p-6 h-full"
+      className="flex-1 flex flex-col p-6 pt-12 h-full"
     >
-      <div className="mt-12 mb-2 text-center">
-        <h1 className="text-[28px] font-bold mb-2">Set up your meals</h1>
-        <p className="text-[16px] text-white/70">Choose your preferences — mix styles freely.</p>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-8">
+        <button
+          onClick={() => navigate("/settings")}
+          className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/80 hover:bg-white/15 transition-colors shrink-0"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1 className="text-[22px] font-bold leading-tight">Diet Preferences</h1>
+          <p className="text-sm text-white/50">Your saved settings from setup</p>
+        </div>
       </div>
 
-      <StepIndicator current={2} />
-
       <GlassCard className="flex-1 flex flex-col gap-7 overflow-y-auto no-scrollbar">
-        {/* Diet types - multi select grid cards */}
+        {/* Diet types */}
         <div>
           <label className="text-sm text-white/70 font-medium mb-3 block">
             Diet Style <span className="text-white/40">(select all that apply)</span>
@@ -137,7 +125,7 @@ export function OnboardingMeal() {
           </div>
         </div>
 
-        {/* Meal timings - multi select */}
+        {/* Meal timings */}
         <div>
           <label className="text-sm text-white/70 font-medium mb-3 block">
             When do you eat? <span className="text-white/40">(tap to toggle)</span>
@@ -228,8 +216,10 @@ export function OnboardingMeal() {
           <div className="text-center text-xs text-white/40 mb-4">
             {selectedTimings.length} meal slot{selectedTimings.length !== 1 ? "s" : ""} · {selectedDiets.length} diet style{selectedDiets.length !== 1 ? "s" : ""}
           </div>
-          <PrimaryButton onClick={() => { saveMealPrefs({ diets: selectedDiets, timings: selectedTimings, cookTime, allergies: selectedAllergies }); navigate("/generating"); }}>
-            Create My Plan
+          <PrimaryButton onClick={handleSave} className={saved_ ? "!from-[#34D399] !to-[#059669]" : ""}>
+            <span className="flex items-center gap-2">
+              {saved_ ? <><Check size={16} /> Saved!</> : "Save Changes"}
+            </span>
           </PrimaryButton>
         </div>
       </GlassCard>
