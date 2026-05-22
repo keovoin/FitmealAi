@@ -130,10 +130,23 @@ final class LoginViewModel: ObservableObject {
         }
     }
 
-    func socialSignIn(_ provider: SocialProvider) async -> AuthSession? {
+    func socialSignIn(
+        _ provider: SocialProvider,
+        authService: AuthService,
+        googleService: GoogleSignInService
+    ) async -> AuthSession? {
         switch provider {
         case .google:
-            errorMessage = "Google sign-in scaffolding is ready. Add the GoogleSignIn iOS package and pass its ID token into AuthService.signInWithIDToken(provider: .google)."
+            isSubmitting = true
+            errorMessage = nil
+            defer { isSubmitting = false }
+
+            do {
+                let idToken = try await googleService.fetchGoogleIDToken()
+                return try await authService.signInWithIDToken(provider: .google, idToken: idToken)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         case .apple:
             errorMessage = "Use the Apple button below so iOS can provide a secure identity token."
         }

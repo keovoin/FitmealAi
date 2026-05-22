@@ -23,8 +23,8 @@ To keep the iOS work safe from accidental overwrites, these paths are owned by s
 
 ## Where to look first
 
-- Want to see the iOS code? Start at [`FitMealAI/App/RootView.swift`](./FitMealAI/App/RootView.swift) — Phase 2 ships a dev screen index that links to every screen.
-- Want to run the admin? `cd admin-web && npm install && npm run dev`. Default login is `fitmeal-admin`.
+- Want to see the iOS code? Start at [`FitMealAI/App/RootView.swift`](./FitMealAI/App/RootView.swift) — it now routes the real app flow.
+- Want to run the admin? `cd admin-web && yarn install && yarn dev`. Local fallback password is `dev-only-password-please-change`; hosted admin uses `ADMIN_PASSWORD`.
 - **Want to deploy the admin to Vercel without installing anything locally?** See [`admin-web/DEPLOY.md`](./admin-web/DEPLOY.md). The key step is setting the **Root Directory** to `admin-web` during import — without that, Vercel will try to build the legacy Vite project at the repo root.
 - Want to read the spec? See [`.kiro/specs/figma-to-swiftui/requirements.md`](./.kiro/specs/figma-to-swiftui/requirements.md) and [`tasks.md`](./.kiro/specs/figma-to-swiftui/tasks.md).
 
@@ -38,4 +38,4 @@ To keep the iOS work safe from accidental overwrites, these paths are owned by s
 - **Phase 4c** — iOS auth (Supabase) + AI service integration. Done.
 - **Phase 4d** — Real iOS navigation shell and app flow. Done.
 - **Phase 4e** — Animation polish. Next.
-- **Phase 5** — Preview and QA, then Android port (Jetpack Compose, reusing the same domain shapes).
+- **Phase 5** — Preview and QA, then Android planning/port (Jetpack Compose, reusing the same domain shapes).

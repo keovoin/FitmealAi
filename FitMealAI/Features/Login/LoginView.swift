@@ -171,12 +171,17 @@ struct LoginView: View {
         VStack(spacing: AppTheme.Spacing.small) {
             SecondaryGlassButton(title: "Continue with Google", icon: "g.circle.fill") {
                 Task {
-                    if let session = await vm.socialSignIn(.google) {
+                    if let session = await vm.socialSignIn(
+                        .google,
+                        authService: appState.authService,
+                        googleService: GoogleSignInService(config: appState.config)
+                    ) {
                         appState.didAuthenticate(session)
                         onAuthenticated?()
                     }
                 }
             }
+            .accessibilityIdentifier("login-google-button")
 
             ZStack {
                 SecondaryGlassButton(title: "Continue with Apple", icon: "apple.logo") {}

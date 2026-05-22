@@ -1,6 +1,7 @@
 # Google Sign-In iOS Setup
 
-Google is scaffolded but not activated because credentials were not provided yet.
+The native token flow is implemented in `Core/Services/GoogleSignInService.swift`.
+It is compiled conditionally, so the app still builds before the Google package is added.
 
 When ready:
 
@@ -10,7 +11,11 @@ When ready:
    - `FITMEAL_GOOGLE_REVERSED_CLIENT_ID`
    - `FITMEAL_GOOGLE_SERVER_CLIENT_ID`
 3. Add the reversed client ID as a URL scheme in the app target.
-4. In `GoogleSignInService.fetchGoogleIDToken()`, call GoogleSignIn native flow and pass the returned ID token to:
+4. Confirm Supabase Auth has Google enabled with the matching web/server client ID.
+5. Tap **Continue with Google**. The app will:
+   - open native Google Sign-In,
+   - read `result.user.idToken.tokenString`,
+   - pass that token to Supabase via `AuthService.signInWithIDToken(provider: .google, idToken:)`.
 
 ```swift
 try await authService.signInWithIDToken(provider: .google, idToken: idToken)

@@ -16,6 +16,9 @@ struct FitMealAIApp: App {
             RootView()
                 .environmentObject(appState)
                 .preferredColorScheme(.dark) // v1: dark glass UI only
+                .onOpenURL { url in
+                    _ = GoogleSignInService(config: appState.config).handleOpenURL(url)
+                }
         }
     }
 }

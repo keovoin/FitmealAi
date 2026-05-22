@@ -33,7 +33,7 @@
 - [x] Build SettingsView (+ ViewModel)
 - [x] Build SettingsMealView (+ ViewModel)
 - [x] Build SettingsWorkoutView (+ ViewModel)
-- [x] Update RootView with Phase-2 dev screen index
+- [x] Update RootView with real app router (Phase 4d replaced the Phase-2 dev index)
 
 ## Phase 3a: Admin CMS scaffold (web)
 - [x] Next.js 15 + Tailwind + cookie auth + sidebar shell
@@ -62,7 +62,7 @@
 - [ ] Admin "regenerate user's plan" tool (deferred to Phase 4c when we have user records)
 
 ## Phase 4c: iOS auth + AI integration
-- [x] AuthService.swift with Supabase Auth (email + Apple + Google ID-token hook)
+- [x] AuthService.swift with Supabase Auth (email + Apple + native Google ID-token flow)
 - [x] AIService.swift calling /api/ai/meal-plan with Supabase JWT
 - [x] Connect LoginView, OnboardingMealView -> persist to Supabase
 - [x] Connect HomeDashboardView -> live profile/tier data from Supabase
