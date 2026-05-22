@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import {
+  Banknote,
   CreditCard,
   LayoutDashboard,
   Leaf,
@@ -17,6 +18,7 @@ const NAV = [
   { href: "/payments", label: "Payments", icon: Wallet, badgeKey: "pendingPayments" as const },
   { href: "/users", label: "Users", icon: Users },
   { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/payment-settings", label: "Payment settings", icon: Banknote },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

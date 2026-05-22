@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     let authService: AuthService
     let preferencesStore: PreferencesStore
     lazy var aiService = AIService(config: config, authService: authService)
+    lazy var paymentOptionsService = PaymentOptionsService(config: config)
     let subscriptionManager: SubscriptionManager
 
     private let onboardingKey = "fitmeal_has_completed_onboarding"

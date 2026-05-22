@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +43,12 @@ import com.fitmealai.ui.theme.FitMealSpacing
 @Composable
 fun PaywallScreen(state: AppState, onClose: () -> Unit) {
     var selectedTier by remember { mutableStateOf(SubscriptionTier.Gold) }
+    val paymentOptions by state.paymentOptions.collectAsState()
+
+    // Refresh per-user payment availability the first time the paywall
+    // sheet opens. The endpoint is uncached so the toggle in
+    // /payment-settings flips live without app restart.
+    LaunchedEffect(Unit) { state.refreshPaymentOptions() }
 
     ScreenContainer(modifier = Modifier.testTag("android-paywall-screen")) {
         TopBar(title = "Upgrade", subtitle = "Unlock unlimited AI plans", onBack = onClose)
@@ -80,10 +88,15 @@ fun PaywallScreen(state: AppState, onClose: () -> Unit) {
             }
         }
 
-        SecondaryGlassButton(
-            title = "Pay manually via ABA",
-            tag = "android-paywall-aba-button",
-        ) { state.showSheet(AppSheet.AbaPayment) }
+        // "Pay manually via ABA" is geo-locked: the admin toggle in
+        // /payment-settings can disable it entirely, and the country
+        // allow-list (default: Cambodia only) hides it everywhere else.
+        if (paymentOptions.abaAvailableForUser) {
+            SecondaryGlassButton(
+                title = "Pay manually via ABA",
+                tag = "android-paywall-aba-button",
+            ) { state.showSheet(AppSheet.AbaPayment) }
+        }
 
         SecondaryGlassButton(
             title = "Restore purchases",

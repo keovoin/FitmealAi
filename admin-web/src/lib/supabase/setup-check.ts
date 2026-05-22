@@ -27,6 +27,7 @@ const REQUIRED_TABLES = [
   "subscriptions",
   "payment_requests",
   "ai_generations",
+  "app_settings",
 ] as const;
 
 export type RequiredTable = (typeof REQUIRED_TABLES)[number];

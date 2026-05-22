@@ -59,7 +59,7 @@ export function SetupRequiredBanner({
               </code>{" "}
               through{" "}
               <code className="rounded bg-white/10 px-1 py-0.5 text-[11px]">
-                0011_*.sql
+                0013_*.sql
               </code>{" "}
               and run them in order.
             </li>

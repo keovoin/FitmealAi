@@ -4,6 +4,7 @@ import { generateMealPlan } from "@/lib/ai/meal-plan-service";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
+import { setAbaPaymentSettings, type AbaPaymentSettings } from "./app-settings";
 
 /**
  * Mark a pending payment as approved or rejected. The DB trigger
@@ -202,4 +203,26 @@ function mealTypeOrder(value: MealTypeValue): number {
 
 function todayString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Persist the ABA payment toggle + allowed-regions list. The change is
+ * effective immediately for every mobile client because /api/payments/options
+ * never caches the row.
+ */
+export async function updateAbaPaymentSettings(
+  next: AbaPaymentSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setAbaPaymentSettings(next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/payment-settings");
+  revalidatePath("/settings");
+  revalidatePath("/setup");
+  return { ok: true };
 }
