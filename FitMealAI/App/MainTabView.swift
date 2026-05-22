@@ -59,12 +59,23 @@ struct MainTabView: View {
         switch sheet {
         case .paywall:
             PaywallView(
+                viewModel: PaywallViewModel(
+                    subscriptionManager: appState.subscriptionManager
+                ),
                 onClose: { appState.activeSheet = nil },
                 onPurchased: { appState.activeSheet = nil },
                 onABAPaymentTapped: { appState.activeSheet = .abaPayment }
             )
         case .abaPayment:
             ABAPaymentView(
+                viewModel: ABAPaymentViewModel(
+                    receiptUploader: ReceiptUploadService(
+                        config: appState.config,
+                        authService: appState.authService,
+                    ),
+                    authService: appState.authService,
+                    config: appState.config,
+                ),
                 onBack: { appState.activeSheet = .paywall },
                 onSubmitted: { request in appState.activeSheet = .paymentPending(request) }
             )

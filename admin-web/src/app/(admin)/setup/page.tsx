@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
+import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
@@ -7,7 +8,8 @@ import {
   probeRequiredTables,
   REQUIRED_TABLES_LIST,
 } from "@/lib/supabase/setup-check";
-import { Check, X, AlertTriangle, Database } from "lucide-react";
+import { getProviderConfigSnapshot } from "@/lib/payments/factory";
+import { Check, X, AlertTriangle, Database, CreditCard } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,11 @@ export default async function SetupHealthPage() {
               name="NEXT_PUBLIC_APP_URL"
               ok={!!process.env.NEXT_PUBLIC_APP_URL}
               detail="Used by the iOS app to find /api/ai endpoints."
+            />
+            <EnvRow
+              name="PAYMENT_PROVIDER_DEFAULT"
+              ok={!!process.env.PAYMENT_PROVIDER_DEFAULT}
+              detail="bakong_khqr | aba_payway | camrapidpay (default: bakong_khqr)."
             />
           </ul>
         </GlassCard>
@@ -188,6 +195,44 @@ export default async function SetupHealthPage() {
             <IntegrationTile name="OpenAI" ok={aiConfigured} />
             <IntegrationTile name="Admin auth" ok={adminPasswordOk && sessionSecretOk} />
           </div>
+        </GlassCard>
+
+        <GlassCard className="lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-white/50">
+                Payment providers
+              </p>
+              <p className="mt-1 text-base font-semibold text-white">
+                KHQR &amp; subscription gateways
+              </p>
+            </div>
+            <CreditCard className="h-5 w-5 text-accent-blue" />
+          </div>
+          <p className="mt-1 text-sm text-white/65">
+            Active provider is selected by{" "}
+            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">PAYMENT_PROVIDER_DEFAULT</code>
+            {" "}env, or per-request via the{" "}
+            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">provider</code> field on
+            {" "}
+            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">/api/payments/create-khqr</code>.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {getProviderConfigSnapshot().map((p) => (
+              <li
+                key={p.id}
+                className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-[12px] text-white/85">{p.id}</p>
+                  <p className="text-xs text-white/55">{p.description}</p>
+                </div>
+                <Badge tone={p.configured ? "green" : "outline"}>
+                  {p.configured ? "Configured" : "Missing env"}
+                </Badge>
+              </li>
+            ))}
+          </ul>
         </GlassCard>
       </div>
     </PageShell>

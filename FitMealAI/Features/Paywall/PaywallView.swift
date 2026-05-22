@@ -56,6 +56,12 @@ struct PaywallView: View {
             secondaryActions
             footer
         }
+        .task {
+            // Loads StoreKit 2 products + their localized prices the first
+            // time the paywall opens. No-op when SubscriptionManager isn't
+            // wired (preview).
+            await vm.loadProducts()
+        }
     }
 
     // MARK: - Sections

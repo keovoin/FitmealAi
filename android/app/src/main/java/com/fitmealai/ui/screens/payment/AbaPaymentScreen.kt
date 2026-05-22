@@ -1,5 +1,9 @@
 package com.fitmealai.ui.screens.payment
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,17 +44,37 @@ import com.fitmealai.ui.components.TopBar
 import com.fitmealai.ui.theme.FitMealColors
 import com.fitmealai.ui.theme.FitMealRadius
 import com.fitmealai.ui.theme.FitMealSpacing
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AbaPaymentScreen(state: AppState, onClose: () -> Unit) {
     val tier = "gold"
     val amount = "\$9.99"
     var transactionId by remember { mutableStateOf("") }
-    var screenshotName by remember { mutableStateOf<String?>(null) }
+    var pickedUri by remember { mutableStateOf<Uri?>(null) }
+    var pickedSizeKb by remember { mutableStateOf(0) }
+    var pickedMimeType by remember { mutableStateOf("image/jpeg") }
     var isSubmitting by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Android Photo Picker (API 19+ on devices with the Photo Picker
+    // module backport, native on API 33+).
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            pickedUri = uri
+            val resolver = context.contentResolver
+            pickedMimeType = resolver.getType(uri) ?: "image/jpeg"
+            pickedSizeKb = runCatching {
+                resolver.openInputStream(uri)?.use { it.available() / 1024 }
+            }.getOrNull() ?: 0
+        }
+    }
 
     ScreenContainer(modifier = Modifier.testTag("android-aba-payment-screen")) {
         TopBar(title = "ABA bank transfer", subtitle = "Pay $amount and submit your reference.", onBack = onClose)
@@ -113,41 +138,61 @@ fun AbaPaymentScreen(state: AppState, onClose: () -> Unit) {
             }
         }
 
-        // Screenshot attach
+        // Screenshot attach (real Photo Picker)
         SecondaryGlassButton(
-            title = if (screenshotName != null) "Attached: $screenshotName" else "Attach screenshot",
+            title = if (pickedUri != null) "Attached: ~${pickedSizeKb}KB image" else "Attach screenshot",
             tag = "android-aba-attach-button",
         ) {
-            // Phase-A4 will hook into the system PhotosPicker. For now we just
-            // store a placeholder file name so the form can advance.
-            screenshotName = "receipt-${System.currentTimeMillis() / 1000}.png"
+            photoPicker.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
         }
 
-        if (error != null) {
-            Text(error!!, color = FitMealColors.ErrorRed, fontSize = 12.sp)
+        if (errorMessage != null) {
+            Text(errorMessage!!, color = FitMealColors.ErrorRed, fontSize = 12.sp)
         }
 
         PrimaryGradientButton(
             title = if (isSubmitting) "Submitting…" else "Submit payment request",
             isLoading = isSubmitting,
-            enabled = !isSubmitting && transactionId.length >= 4 && screenshotName != null,
+            enabled = !isSubmitting && transactionId.length >= 4 && pickedUri != null,
             tag = "android-aba-submit-button",
         ) {
             val session = state.session.value
             if (session == null) {
-                error = "Sign in before submitting payment."
+                errorMessage = "Sign in before submitting payment."
+                return@PrimaryGradientButton
+            }
+            val uri = pickedUri ?: run {
+                errorMessage = "Please attach a screenshot."
                 return@PrimaryGradientButton
             }
             scope.launch {
                 isSubmitting = true
-                error = null
+                errorMessage = null
                 try {
-                    val result = state.paymentRepository.submitAbaPayment(
+                    // 1. Read the picked image into memory.
+                    val bytes = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    } ?: throw IllegalStateException("Could not read selected image")
+
+                    // 2. Upload to Supabase Storage (returns the storage path).
+                    val storagePath = state.paymentRepository.uploadReceipt(
+                        session = session,
+                        bytes = bytes,
+                        contentType = pickedMimeType,
+                    )
+
+                    // 3. Insert payment_requests row (provider = manual_aba).
+                    state.paymentRepository.submitAbaPayment(
                         session = session,
                         tier = tier,
                         amount = amount,
                         transactionId = transactionId.trim(),
+                        receiptStoragePath = storagePath,
+                        provider = "manual_aba",
                     )
+
                     state.showSheet(
                         AppSheet.PaymentPending(
                             transactionId = transactionId.trim(),
@@ -155,7 +200,7 @@ fun AbaPaymentScreen(state: AppState, onClose: () -> Unit) {
                         )
                     )
                 } catch (t: Throwable) {
-                    error = t.message ?: "Submit failed"
+                    errorMessage = t.message ?: "Submit failed"
                 } finally {
                     isSubmitting = false
                 }
