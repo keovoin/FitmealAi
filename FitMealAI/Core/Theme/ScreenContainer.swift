@@ -28,6 +28,7 @@ struct ScreenContainer<Content: View>: View {
                 .padding(.horizontal, horizontalPadding)
                 .padding(.top, topPadding)
                 .padding(.bottom, bottomPadding)
+                .screenEntrance()
             }
         }
     }

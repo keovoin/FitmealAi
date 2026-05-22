@@ -9,11 +9,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 object FitMealColors {
-    val GradientStart = Color(0xFF0F172A)
-    val GradientMid = Color(0xFF1E3A8A)
-    val GradientEnd = Color(0xFF7C3AED)
-    val AccentBlue = Color(0xFF4F8CFF)
-    val AccentPurple = Color(0xFF8F5CFF)
+    val GradientStart = Color(0xFF040B08)
+    val GradientMid = Color(0xFF081611)
+    val GradientEnd = Color(0xFF0B3B2E)
+    val AccentBlue = Color(0xFF19B887)
+    val AccentPurple = Color(0xFF38D399)
     val SuccessGreen = Color(0xFF34D399)
     val ErrorRed = Color(0xFFEF4444)
     val TextPrimary = Color.White

@@ -15,14 +15,14 @@ enum AppTheme {
     // MARK: - Colors
 
     enum Colors {
-        // Background gradient stops: #0F172A -> #1E3A8A -> #7C3AED
-        static let gradientStart = Color(red: 0.06, green: 0.09, blue: 0.16) // #0F172A
-        static let gradientMid   = Color(red: 0.12, green: 0.23, blue: 0.54) // #1E3A8A
-        static let gradientEnd   = Color(red: 0.49, green: 0.23, blue: 0.93) // #7C3AED
+        // Premium wellness gradient stops: #040B08 -> #081611 -> #0B3B2E
+        static let gradientStart = Color(red: 0.02, green: 0.04, blue: 0.03) // #040B08
+        static let gradientMid   = Color(red: 0.03, green: 0.09, blue: 0.07) // #081611
+        static let gradientEnd   = Color(red: 0.04, green: 0.23, blue: 0.18) // #0B3B2E
 
         // Brand accents (match React prototype)
-        static let accentBlue   = Color(red: 0.31, green: 0.55, blue: 1.00)  // #4F8CFF
-        static let accentPurple = Color(red: 0.56, green: 0.36, blue: 1.00)  // #8F5CFF
+        static let accentBlue   = Color(red: 0.10, green: 0.72, blue: 0.54)  // emerald cyan
+        static let accentPurple = Color(red: 0.22, green: 0.82, blue: 0.60)  // emerald glow
 
         // Status
         static let successGreen     = Color(red: 0.20, green: 0.83, blue: 0.60) // #34D399
@@ -30,8 +30,8 @@ enum AppTheme {
         static let errorRed         = Color(red: 0.94, green: 0.27, blue: 0.27) // #EF4444
 
         // Glass / strokes
-        static let glassStroke = Color.white.opacity(0.20)
-        static let glassShadow = Color.black.opacity(0.18)
+        static let glassStroke = Color.white.opacity(0.12)
+        static let glassShadow = Color.black.opacity(0.34)
 
         // Text
         static let textPrimary   = Color.white
@@ -40,8 +40,8 @@ enum AppTheme {
         static let textQuaternary = Color.white.opacity(0.40)
 
         // Plan accents (used later by paywall)
-        static let goldStart = Color(red: 1.00, green: 0.84, blue: 0.40)
-        static let goldEnd   = Color(red: 0.95, green: 0.62, blue: 0.20)
+        static let goldStart = Color(red: 1.00, green: 0.86, blue: 0.42)
+        static let goldEnd   = Color(red: 0.85, green: 0.58, blue: 0.18)
     }
 
     // MARK: - Gradients
@@ -54,7 +54,7 @@ enum AppTheme {
         )
 
         static let primaryButton = LinearGradient(
-            colors: [Colors.accentBlue, Colors.accentPurple],
+            colors: [Colors.accentPurple, Colors.accentBlue],
             startPoint: .leading,
             endPoint: .trailing
         )

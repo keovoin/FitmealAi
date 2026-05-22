@@ -39,6 +39,6 @@ To keep the iOS work safe from accidental overwrites, these paths are owned by s
 - **Phase 4b** — AI meal generation endpoint with rate limits + image caching. Done.
 - **Phase 4c** — iOS auth (Supabase) + AI service integration. Done.
 - **Phase 4d** — Real iOS navigation shell and app flow. Done.
-- **Phase 4e** — Animation polish. Next.
+- **Phase 4e** — Animation/layout polish. In progress: global premium emerald theme + screen entrance polish done.
 - **Phase 5** — Preview and QA, then Android planning/port (Jetpack Compose, reusing the same domain shapes).
 - **Android A1** — Compose project shell, theme, models, mock data, and starter flow. Done.

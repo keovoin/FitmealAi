@@ -31,9 +31,12 @@ Android A1 has now started. Continue cautiously: the iOS app still needs **Phase
 - Login, onboarding goal/workout/meal, home dashboard, meals, workout, habits, progress, settings.
 
 ### A3 — Integrations
-- Supabase auth/session storage.
-- AI meal generation endpoint.
-- Google Sign-In via Credential Manager.
+- [x] Add config-driven Supabase auth REST repository.
+- [x] Add config-driven AI meal generation repository.
+- [x] Add config-driven ABA payment request repository.
+- [ ] Add encrypted session storage.
+- [ ] Add Google Sign-In via Credential Manager.
+- [ ] Connect repositories to ViewModels and screen state.
 
 ### A4 — Payments
 - Google Play Billing for subscriptions.

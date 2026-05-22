@@ -19,8 +19,8 @@ struct GlassBackground: View {
 
             // Subtle radial highlight for depth behind glass cards.
             RadialGradient(
-                colors: [Color.white.opacity(0.08), Color.clear],
-                center: .topLeading,
+                colors: [AppTheme.Colors.accentPurple.opacity(0.16), Color.clear],
+                center: .topTrailing,
                 startRadius: 0,
                 endRadius: 420
             )
@@ -30,13 +30,13 @@ struct GlassBackground: View {
 
             if showGlows {
                 Circle()
-                    .fill(AppTheme.Colors.accentPurple.opacity(0.25))
+                    .fill(AppTheme.Colors.accentPurple.opacity(0.24))
                     .frame(width: 340, height: 340)
                     .blur(radius: 100)
                     .offset(y: -240)
 
                 Circle()
-                    .fill(AppTheme.Colors.accentBlue.opacity(0.20))
+                    .fill(AppTheme.Colors.accentBlue.opacity(0.18))
                     .frame(width: 200, height: 200)
                     .blur(radius: 80)
                     .offset(x: 120, y: -160)

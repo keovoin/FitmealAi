@@ -78,11 +78,12 @@
 - [x] Connect Settings sub-screens (Meal / Workout)
 
 ## Phase 4e: Animation polish
-- [ ] Add card entrance animations
-- [ ] Add button press animations (already implemented via PressableScaleStyle)
+- [x] Add card/screen entrance animations
+- [x] Add button press animations (already implemented via PressableScaleStyle)
 - [ ] Add habit check animation (already implemented)
-- [ ] Add AI loading skeleton (already implemented in AIGeneratingView)
-- [ ] Add Gold plan glow (already implemented in PaywallView)
+- [x] Add AI loading skeleton (already implemented in AIGeneratingView)
+- [x] Add Gold plan glow (already implemented in PaywallView)
+- [x] Apply premium emerald/dark-glass theme alignment globally
 
 ## Phase 5: Preview and QA
 - [ ] Verify #Preview on every view (done as part of Phase 2)
