@@ -1,0 +1,114 @@
+{
+  "theme": "DARK",
+  "archetype": "5 (Jewel & Luxury)",
+  "domain": "Health, Wellness, Fitness",
+  "emotional_tone": "Premium, Cinematic, Focused, Calm",
+  "typography": {
+    "font_pairings": {
+      "heading": "Outfit",
+      "body": "Manrope"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-light tracking-tighter leading-tight text-white",
+      "h2": "text-2xl sm:text-3xl font-light tracking-tight text-white",
+      "h3": "text-xl sm:text-2xl font-medium tracking-tight text-emerald-50",
+      "h4": "text-lg font-medium tracking-tight text-emerald-100",
+      "body": "text-base font-normal leading-relaxed text-emerald-100/70",
+      "small_label": "text-xs font-bold uppercase tracking-[0.2em] text-emerald-500"
+    }
+  },
+  "color_palette": {
+    "background": {
+      "base": "bg-[#040B08]",
+      "surface": "bg-[#081611]",
+      "surface_elevated": "bg-[#0C1F18]"
+    },
+    "text": {
+      "primary": "text-white",
+      "secondary": "text-emerald-50/70",
+      "tertiary": "text-emerald-50/40"
+    },
+    "brand_accents": {
+      "primary": "emerald-500",
+      "primary_hover": "emerald-400",
+      "subtle_glow": "bg-emerald-500/10",
+      "border_glow": "border-emerald-500/30"
+    },
+    "borders": {
+      "default": "border-white/5",
+      "glass": "border-white/10"
+    }
+  },
+  "surface_strategies": {
+    "glassmorphism": {
+      "usage": "Headers, Bottom Nav, Sticky Overlays, Premium Paywall Cards",
+      "classes": "bg-[#040B08]/60 backdrop-blur-2xl backdrop-saturate-150 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+    },
+    "bento_cards": {
+      "usage": "Dashboard Widgets, Meal Plans, Workout Summaries",
+      "classes": "bg-white/[0.02] border border-white/5 rounded-3xl p-6 hover:bg-white/[0.04] transition-all duration-300"
+    }
+  },
+  "layout_spacing": {
+    "container_padding": "px-6 md:px-8 py-8 md:py-12",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6",
+    "card_padding": "p-6 md:p-8"
+  },
+  "components_strategy": {
+    "buttons": {
+      "primary": "bg-emerald-500 text-[#040B08] font-medium px-8 py-4 rounded-full hover:bg-emerald-400 transition-colors shadow-[0_0_20px_rgba(16,185,129,0.3)]",
+      "secondary": "bg-white/5 text-white border border-white/10 px-8 py-4 rounded-full hover:bg-white/10 transition-colors"
+    },
+    "inputs": {
+      "classes": "bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 placeholder:text-white/30"
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "stroke-[1.5] text-emerald-500"
+  },
+  "media": {
+    "backgrounds": [
+      {
+        "category": "paywall_hero_bg",
+        "url": "https://static.prod-images.emergentagent.com/jobs/9a871a8b-e7dd-4008-a3b9-b82d05d73674/images/e6d9cf5a9012a1b019525a37a814eb86b3879fcfe9eed97bc7c8f74c0fe33d6c.png",
+        "description": "Dark glassmorphism abstract background for premium wellness app, deep emerald and midnight blue tones"
+      }
+    ],
+    "content": [
+      {
+        "category": "meal_healthy",
+        "url": "https://images.unsplash.com/photo-1611599537845-1c7aca0091c0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwyfHxoZWFsdGh5JTIwbW9kZXJuJTIwbWVhbCUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3OTQ0NzIxNnww&ixlib=rb-4.1.0&q=85",
+        "description": "Grilled meat with green vegetable on black ceramic plate for meal plans"
+      },
+      {
+        "category": "workout_strength",
+        "url": "https://images.pexels.com/photos/13106808/pexels-photo-13106808.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Woman working out in dark modern gym"
+      },
+      {
+        "category": "workout_yoga",
+        "url": "https://images.unsplash.com/photo-1681977151572-78a1ba5f8627?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwyfHx5b2dhJTIwZGFyayUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzc5NDQ3MjIxfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Man doing yoga pose in dark studio"
+      }
+    ],
+    "avatars": [
+      {
+        "category": "user_profile",
+        "url": "https://images.unsplash.com/photo-1505274664176-44ccaa7969a8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwxfHxwcm9maWxlJTIwcGljdHVyZSUyMHBlcnNvbiUyMGZhY2UlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3Nzk0NDcyMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Profile picture of user face"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "This is a mobile app UI built with React.js + Tailwind (likely wrapped in a WebView/Capacitor/PWA since 'work on iOS and Android in parallel' was requested). Use mobile-first responsive design constraints (e.g., max-w-md mx-auto for screens, bottom safe areas for mobile).",
+    "Use Framer Motion for screen transitions, micro-interactions on buttons, and stagger animations for bento grids.",
+    "Implement the 'Glassmorphism' surface strategy on sticky headers, bottom navigation, and paywall overlays to create depth.",
+    "Do NOT use pure #000000. Use the defined #040B08 (Deep Emerald/Obsidian mix) as the absolute base to make the UI feel alive and premium.",
+    "Use Lucide React icons exclusively.",
+    "Data-testid attributes MUST be added to all interactive elements for testing.",
+    "For the AI meal generation, use a loading state that incorporates subtle pulsing glows (emerald-500/20) to make it feel 'intelligent' and premium.",
+    "Ensure all components have 'rounded-2xl' or 'rounded-3xl' to match the premium, modern aesthetic.",
+    "Always rely on optical alignment, and provide ample spacing (`gap-4` or `gap-6` between mobile sections) for breathing room."
+  ]
+}
