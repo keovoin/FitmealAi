@@ -21,7 +21,14 @@ export interface MealPlanOutcome {
   meals: Array<{
     meal_id: string;
     title: string;
+    description: string | null;
+    meal_type: "breakfast" | "lunch" | "dinner" | "snack";
     calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    ingredients: GeneratedMeal["ingredients"];
+    recipe_steps: string[];
     image_url: string | null;
     cache_hit: boolean;
   }>;
@@ -223,8 +230,8 @@ async function findReusablePlan(
       `id,
        generated_model,
        items:meal_plan_items (
-         meal_id, position,
-         meal:meals ( title, calories, image_url )
+         meal_id, position, calories, protein_g, carbs_g, fat_g,
+         meal:meals ( title, description, meal_type, calories, protein_g, carbs_g, fat_g, ingredients, recipe_steps, image_url )
        )`,
     )
     .eq("user_id", req.user_id)
@@ -238,7 +245,22 @@ async function findReusablePlan(
   type ItemRow = {
     meal_id: string;
     position: number;
-    meal: { title: string; calories: number; image_url: string | null } | null;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    meal: {
+      title: string;
+      description: string | null;
+      meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+      calories: number;
+      protein_g: number;
+      carbs_g: number;
+      fat_g: number;
+      ingredients: GeneratedMeal["ingredients"];
+      recipe_steps: string[];
+      image_url: string | null;
+    } | null;
   };
   const items = (data.items as unknown as ItemRow[]) ?? [];
   if (items.length === 0) return null;
@@ -252,7 +274,14 @@ async function findReusablePlan(
       .map((it) => ({
         meal_id: it.meal_id,
         title: it.meal?.title ?? "",
-        calories: it.meal?.calories ?? 0,
+        description: it.meal?.description ?? null,
+        meal_type: it.meal?.meal_type ?? "snack",
+        calories: it.calories ?? it.meal?.calories ?? 0,
+        protein_g: it.protein_g ?? it.meal?.protein_g ?? 0,
+        carbs_g: it.carbs_g ?? it.meal?.carbs_g ?? 0,
+        fat_g: it.fat_g ?? it.meal?.fat_g ?? 0,
+        ingredients: it.meal?.ingredients ?? [],
+        recipe_steps: it.meal?.recipe_steps ?? [],
         image_url: it.meal?.image_url ?? null,
         cache_hit: true,
       })),
@@ -285,7 +314,14 @@ async function persistMeal(
     return {
       meal_id: "",
       title: meal.title,
+      description: meal.description ?? null,
+      meal_type: meal.meal_type,
       calories: meal.calories,
+      protein_g: meal.protein_g,
+      carbs_g: meal.carbs_g,
+      fat_g: meal.fat_g,
+      ingredients: meal.ingredients,
+      recipe_steps: meal.recipe_steps,
       image_url: null,
       cache_hit: false,
     };
@@ -318,13 +354,20 @@ async function persistMeal(
     });
     const { data: existing } = await sb
       .from("meals")
-      .select("image_url")
+      .select("title,description,meal_type,calories,protein_g,carbs_g,fat_g,ingredients,recipe_steps,image_url")
       .eq("id", mealId)
       .single();
     return {
       meal_id: mealId,
-      title: meal.title,
+      title: existing?.title ?? meal.title,
+      description: existing?.description ?? meal.description ?? null,
+      meal_type: existing?.meal_type ?? meal.meal_type,
       calories: meal.calories,
+      protein_g: meal.protein_g,
+      carbs_g: meal.carbs_g,
+      fat_g: meal.fat_g,
+      ingredients: (existing?.ingredients as GeneratedMeal["ingredients"] | undefined) ?? meal.ingredients,
+      recipe_steps: (existing?.recipe_steps as string[] | undefined) ?? meal.recipe_steps,
       image_url: existing?.image_url ?? null,
       cache_hit: true,
     };
@@ -336,7 +379,14 @@ async function persistMeal(
   return {
     meal_id: mealId,
     title: meal.title,
+    description: meal.description ?? null,
+    meal_type: meal.meal_type,
     calories: meal.calories,
+    protein_g: meal.protein_g,
+    carbs_g: meal.carbs_g,
+    fat_g: meal.fat_g,
+    ingredients: meal.ingredients,
+    recipe_steps: meal.recipe_steps,
     image_url: imageUrl,
     cache_hit: false,
   };

@@ -15,6 +15,7 @@ import { relativeFromNow } from "@/lib/format";
 import { ArrowRight, CreditCard, TrendingUp, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { SignupsChart } from "./signups-chart";
+import { DashboardRegenerateTool } from "./dashboard-regenerate-tool";
 
 // Always render fresh; never cache the dashboard since it shows live counters.
 export const dynamic = "force-dynamic";
@@ -68,6 +69,25 @@ export default async function DashboardPage() {
           delta="Monthly recurring"
           tone="green"
         />
+      </div>
+
+      <div className="mt-4">
+        <GlassCard>
+          <div className="flex items-start gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-white/50">
+                Support tool
+              </p>
+              <p data-testid="dashboard-regenerate-title" className="text-base font-semibold text-white">
+                Regenerate a user&apos;s meal plan
+              </p>
+              <p className="mt-1 text-sm text-white/60">
+                Paste a Supabase user ID to rebuild today&apos;s AI meal plan from saved preferences.
+              </p>
+            </div>
+          </div>
+          <DashboardRegenerateTool />
+        </GlassCard>
       </div>
 
       {/* Chart + tier breakdown */}

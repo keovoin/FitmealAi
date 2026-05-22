@@ -35,7 +35,10 @@ The iOS app now reads Supabase/API values from Info.plist keys so real values st
 | `FITMEAL_SUPABASE_URL` | Your Supabase project URL |
 | `FITMEAL_SUPABASE_ANON_KEY` | Your public Supabase anon key |
 | `FITMEAL_API_BASE_URL` | Your hosted `admin-web` base URL |
+| `FITMEAL_GOOGLE_IOS_CLIENT_ID` | Google iOS OAuth client ID |
+| `FITMEAL_GOOGLE_REVERSED_CLIENT_ID` | Google URL scheme / reversed client ID |
+| `FITMEAL_GOOGLE_SERVER_CLIENT_ID` | Google Web/Server client ID for ID-token audience |
 
 Use `Resources/Config/FitMealConfig.example.plist` as the template, or open the admin Settings page and use the **iOS runtime config** helper to generate the snippet.
 
-Email/password and Apple Sign In are wired through Supabase Auth. Google Sign-In has the service hook ready (`AuthService.signInWithIDToken(provider: .google, idToken:)`); add the GoogleSignIn iOS package/client ID in Xcode to complete the native token handoff.
+Email/password and Apple Sign In are wired through Supabase Auth. Google Sign-In has the service hook ready (`AuthService.signInWithIDToken(provider: .google, idToken:)`); see `Resources/Config/GoogleSignInSetup.md` to complete the native package/token handoff once Google credentials are ready.

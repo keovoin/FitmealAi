@@ -105,31 +105,57 @@ private struct MealPlanAIResponse: Decodable {
     let meals: [AIMealSummary]
 
     func asMealPlan(date: Date) -> MealPlan {
-        MealPlan(
-            date: date,
-            meals: meals.enumerated().map { index, item in
-                let calories = max(item.calories, 50)
-                return Meal(
-                    id: UUID(uuidString: item.meal_id) ?? UUID(),
-                    type: MealType.apiOrder[safe: index] ?? .snack,
-                    title: item.title,
-                    calories: calories,
-                    proteinGrams: max(8, calories / 18),
-                    carbsGrams: max(12, calories / 10),
-                    fatGrams: max(5, calories / 32),
-                    imageName: item.image_url,
-                    ingredients: []
-                )
-            }
-        )
+        MealPlan(date: date, meals: meals.map { $0.asMeal() })
     }
 }
 
 private struct AIMealSummary: Decodable {
     let meal_id: String
     let title: String
+    let description: String?
+    let meal_type: String?
     let calories: Int
+    let protein_g: Int?
+    let carbs_g: Int?
+    let fat_g: Int?
+    let ingredients: [AIIngredient]?
+    let recipe_steps: [String]?
     let image_url: String?
+
+    func asMeal() -> Meal {
+        let calories = max(calories, 50)
+        return Meal(
+            id: UUID(uuidString: meal_id) ?? UUID(),
+            type: MealType(apiValue: meal_type) ?? .snack,
+            title: title,
+            calories: calories,
+            proteinGrams: protein_g ?? max(8, calories / 18),
+            carbsGrams: carbs_g ?? max(12, calories / 10),
+            fatGrams: fat_g ?? max(5, calories / 32),
+            imageName: image_url,
+            ingredients: ingredients?.map { $0.asIngredient() } ?? []
+        )
+    }
+}
+
+private struct AIIngredient: Decodable {
+    let name: String
+    let grams: Int
+    let calories: Int
+    let protein_g: Int
+    let carbs_g: Int
+    let fat_g: Int
+
+    func asIngredient() -> Ingredient {
+        Ingredient(
+            name: name,
+            grams: grams,
+            calories: calories,
+            proteinGrams: protein_g,
+            carbsGrams: carbs_g,
+            fatGrams: fat_g
+        )
+    }
 }
 
 private struct AIErrorResponse: Decodable {
@@ -170,7 +196,15 @@ private extension MealPrefs {
 }
 
 private extension MealType {
-    static let apiOrder: [MealType] = [.breakfast, .lunch, .dinner, .snack]
+    init?(apiValue: String?) {
+        switch apiValue {
+        case "breakfast": self = .breakfast
+        case "lunch": self = .lunch
+        case "dinner": self = .dinner
+        case "snack": self = .snack
+        default: return nil
+        }
+    }
 
     static func apiSortIndex(_ value: String) -> Int {
         switch value {
@@ -179,11 +213,5 @@ private extension MealType {
         case "dinner": return 2
         default: return 3
         }
-    }
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }

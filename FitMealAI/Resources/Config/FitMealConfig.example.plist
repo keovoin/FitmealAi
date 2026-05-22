@@ -8,5 +8,11 @@
   <string>your-public-anon-key</string>
   <key>FITMEAL_API_BASE_URL</key>
   <string>https://your-admin-domain.vercel.app</string>
+  <key>FITMEAL_GOOGLE_IOS_CLIENT_ID</key>
+  <string>your-ios-client-id.apps.googleusercontent.com</string>
+  <key>FITMEAL_GOOGLE_REVERSED_CLIENT_ID</key>
+  <string>com.googleusercontent.apps.your-ios-client-id</string>
+  <key>FITMEAL_GOOGLE_SERVER_CLIENT_ID</key>
+  <string>your-web-client-id.apps.googleusercontent.com</string>
 </dict>
 </plist>

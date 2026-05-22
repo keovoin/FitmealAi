@@ -40,8 +40,8 @@ export default function AdminSettingsPage() {
           </p>
           <p className="mt-2 text-sm text-white/65">
             Use this admin-only helper to insert or replace the iOS Info.plist
-            values. The anon key is public, but the service-role key must stay
-            server-only and should never be pasted into Xcode.
+            values, including Google placeholders when ready. The anon key is public,
+            but the service-role key must stay server-only and should never be pasted into Xcode.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={supabaseOn ? "green" : "outline"}>
@@ -53,6 +53,7 @@ export default function AdminSettingsPage() {
             <Badge tone={apiBaseUrl ? "green" : "outline"}>
               API URL {apiBaseUrl ? "ready" : "missing"}
             </Badge>
+            <Badge tone="outline">Google fields manual</Badge>
           </div>
           <MobileConfigPanel
             initialSupabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}

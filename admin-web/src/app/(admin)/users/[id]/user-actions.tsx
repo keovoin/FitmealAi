@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { compGold, setUserStatus } from "@/lib/supabase/admin-actions";
+import { compGold, regenerateUserMealPlan, setUserStatus } from "@/lib/supabase/admin-actions";
 import type { SubscriptionTier, UserStatus } from "@/data/types";
 import { useTransition, useState } from "react";
 
@@ -18,7 +18,7 @@ export function UserActions({
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  function run(label: string, action: () => Promise<{ ok: boolean; error?: string; already?: boolean }>) {
+  function run(label: string, action: () => Promise<{ ok: boolean; error?: string; already?: boolean; mealCount?: number }>) {
     setFeedback(null);
     setBusy(label);
     startTransition(async () => {
@@ -32,6 +32,10 @@ export function UserActions({
         setFeedback("User already has an active Gold subscription.");
         return;
       }
+      if (label === "regenerate") {
+        setFeedback(`Regenerated ${result.mealCount ?? 0} meals for today.`);
+        return;
+      }
       setFeedback("Done. The page will refresh momentarily.");
     });
   }
@@ -42,6 +46,17 @@ export function UserActions({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         <Button
+          data-testid="user-actions-regenerate-plan-button"
+          variant="secondary"
+          size="sm"
+          loading={busy === "regenerate" || pending}
+          onClick={() => run("regenerate", () => regenerateUserMealPlan(userId))}
+        >
+          Regenerate plan
+        </Button>
+
+        <Button
+          data-testid="user-actions-comp-gold-button"
           variant="secondary"
           size="sm"
           loading={busy === "comp" || pending}
@@ -53,6 +68,7 @@ export function UserActions({
 
         {isActive ? (
           <Button
+            data-testid="user-actions-suspend-button"
             variant="danger"
             size="sm"
             loading={busy === "suspend" || pending}
@@ -62,6 +78,7 @@ export function UserActions({
           </Button>
         ) : (
           <Button
+            data-testid="user-actions-reactivate-button"
             variant="success"
             size="sm"
             loading={busy === "reactivate" || pending}
@@ -73,7 +90,7 @@ export function UserActions({
       </div>
 
       {feedback && (
-        <p className="text-[11px] text-white/55">{feedback}</p>
+        <p data-testid="user-actions-feedback" className="text-[11px] text-white/55">{feedback}</p>
       )}
     </div>
   );

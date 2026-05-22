@@ -13,19 +13,28 @@ struct FitMealConfig: Equatable {
     var supabaseURLString: String
     var supabaseAnonKey: String
     var apiBaseURLString: String
+    var googleIOSClientID: String
+    var googleReversedClientID: String
+    var googleServerClientID: String
 
     static var current: FitMealConfig {
         FitMealConfig(
             supabaseURLString: Bundle.main.stringValue(forInfoKey: "FITMEAL_SUPABASE_URL"),
             supabaseAnonKey: Bundle.main.stringValue(forInfoKey: "FITMEAL_SUPABASE_ANON_KEY"),
-            apiBaseURLString: Bundle.main.stringValue(forInfoKey: "FITMEAL_API_BASE_URL")
+            apiBaseURLString: Bundle.main.stringValue(forInfoKey: "FITMEAL_API_BASE_URL"),
+            googleIOSClientID: Bundle.main.stringValue(forInfoKey: "FITMEAL_GOOGLE_IOS_CLIENT_ID"),
+            googleReversedClientID: Bundle.main.stringValue(forInfoKey: "FITMEAL_GOOGLE_REVERSED_CLIENT_ID"),
+            googleServerClientID: Bundle.main.stringValue(forInfoKey: "FITMEAL_GOOGLE_SERVER_CLIENT_ID")
         )
     }
 
     static let preview = FitMealConfig(
         supabaseURLString: "https://your-project-ref.supabase.co",
         supabaseAnonKey: "your-public-anon-key",
-        apiBaseURLString: "https://your-admin-web-domain.com"
+        apiBaseURLString: "https://your-admin-web-domain.com",
+        googleIOSClientID: "your-ios-client-id.apps.googleusercontent.com",
+        googleReversedClientID: "com.googleusercontent.apps.your-ios-client-id",
+        googleServerClientID: "your-web-client-id.apps.googleusercontent.com"
     )
 
     var supabaseURL: URL? { URL(string: supabaseURLString.trimmed) }
@@ -37,6 +46,10 @@ struct FitMealConfig: Equatable {
 
     var isAPIConfigured: Bool {
         apiBaseURL != nil
+    }
+
+    var isGoogleConfigured: Bool {
+        !googleIOSClientID.trimmed.isEmpty && !googleReversedClientID.trimmed.isEmpty
     }
 }
 
