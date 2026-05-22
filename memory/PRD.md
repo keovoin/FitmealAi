@@ -51,3 +51,11 @@ User asked to review the connected repo/admin password, implement Phase 4c + 4d,
 - Add server-side ingredient/allergy validation and macro tolerance checks.
 - Add richer admin AI history and payment support panels.
 - Add automated iOS/Android UI tests once native projects are available.
+
+
+## Deployment Health Check — Latest
+- Deployment agent status for Emergent/Kubernetes: NOT DEPLOYABLE because this repo is not the standard FastAPI backend + React frontend supervisor model. It is native iOS + native Android + Vercel-targeted Next.js admin + Supabase.
+- Admin-web health: ESLint pass, TypeScript pass, Next.js production build pass.
+- Backend/admin contract tests: 17/17 pass locally with NEXT_PUBLIC_APP_URL=http://localhost:3000.
+- Local build warning: ADMIN_PASSWORD is missing in this workspace; hosted admin must set ADMIN_PASSWORD to allow login.
+- Mobile deployment: iOS/Android require native build tooling and real config values; Android CLI build is still blocked by missing Gradle wrapper/tooling in workspace.
