@@ -4,6 +4,12 @@ import { MealPlanRequestSchema } from "@/lib/ai/types";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+// Pin to Node runtime: uses Supabase service-role client + OpenAI SDK.
+// Both rely on Node-only APIs and would crash on Edge.
+export const runtime = "nodejs";
+// Allow up to 60 seconds for the full text+image generation pass.
+export const maxDuration = 60;
+
 /**
  * POST /api/ai/meal-plan
  *

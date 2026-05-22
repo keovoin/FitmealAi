@@ -21,3 +21,19 @@ Defense in depth:
 - The admin session cookie value is `sha256(PROCESS_SECRET || ADMIN_PASSWORD)`, so cookies issued before a password rotation stop validating after the next deploy.
 - The AI meal-plan endpoint enforces a per-user daily cap AND a global daily USD cap (`OPENAI_DAILY_BUDGET_USD`). The DB function is the source of truth on per-user limits; the API just calls it.
 - Storage bucket `receipts` is private; URLs only resolve via service role. `meal-images` is public but writable only by service role.
+
+
+
+## Edge runtime caveats (Next.js)
+
+`middleware.ts` runs on the Vercel **Edge** runtime, which is a strict subset of Node:
+
+- No Node built-ins like `crypto`, `Buffer`, `fs`, `net`, `child_process`
+- No long-running async work (request budget is small)
+- No `process.env` access pattern that triggers a Node import as a side effect
+
+Rules:
+- **Middleware imports must come from `@/lib/auth-constants` only**, never from `@/lib/auth`. The latter uses Node `crypto` and importing it from middleware will throw `MIDDLEWARE_INVOCATION_FAILED` on Vercel.
+- For any new constant the middleware needs, add it to `auth-constants.ts` (or create a similar tiny edge-safe file). Re-export from the Node-side module so existing imports don't change.
+- Route handlers that touch Supabase, OpenAI, or anything Node-only must declare `export const runtime = "nodejs";` at the top of the file. This is belt-and-suspenders against a future Edge default.
+- Server Components in the App Router default to Node, so they're fine to use `auth.ts` directly.

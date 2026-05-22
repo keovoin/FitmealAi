@@ -2,6 +2,10 @@ import { ADMIN_COOKIE, verifyAdminPassword } from "@/lib/auth";
 import { checkLoginRateLimit, recordLoginFailure } from "@/lib/rate-limit-login";
 import { NextResponse } from "next/server";
 
+// Pin to Node runtime: this handler uses Node `crypto` indirectly via
+// auth.ts. Edge runtime would crash on import.
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   // Best-effort client identifier. Vercel sets x-forwarded-for; fall back
   // to a constant string so all unknown clients share the same bucket.
