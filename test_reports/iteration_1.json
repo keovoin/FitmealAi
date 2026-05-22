@@ -1,0 +1,55 @@
+{
+  "summary": "Tested Phase 4c/4d admin-web + iOS changes via build, API regression tests, UI smoke, and Swift static review. Found a critical middleware/API integration bug blocking iOS meal-plan calls.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/ai/meal-plan",
+        "issue": "Unauthenticated request returns 307 redirect to /login (middleware) instead of route-level 401 missing_authorization required by Phase 4c.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "iOS AIService -> admin-web /api/ai/meal-plan",
+        "issue": "Edge middleware blocks API path before Supabase JWT validation runs, so mobile clients are redirected to /login.",
+        "affected_selectors": [
+          "N/A (API route interception in middleware)"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_web_phase4_auth_and_config.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Update admin-web middleware PUBLIC_PATHS/matcher to allow /api/ai/meal-plan through without admin session redirect.",
+    "Re-run unauthorized meal-plan test to confirm 401 missing_authorization contract.",
+    "Provide valid admin test credentials and ADMIN_PASSWORD in test env to enable authenticated Settings UI validation."
+  ],
+  "critical_code_review_comments": [
+    "src/middleware.ts currently allows only /login, /api/login, /api/logout as public. This conflicts with mobile API usage for /api/ai/meal-plan.",
+    "In route.ts, config checks (Supabase/OpenAI) run before missing Authorization check; when env is absent local behavior becomes 503, masking auth contract during local smoke tests.",
+    "Swift side wiring (RootView, MainTabView, AuthService, AIService, AppState) is structurally consistent with requested Phase 4c/4d flows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_web_phase4_auth_and_config.py",
+    "/app/test_reports/iteration_1.json"
+  ],
+  "success_rate": {
+    "backend": "67%",
+    "frontend": "60%"
+  },
+  "test_credentials": "Missing: /app/memory/test_credentials.md not found in workspace.",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin-web dev server was started locally on :3000 for this run. pytest captured 1 fail/2 pass. Re-validate /api/ai/meal-plan after middleware change and then test Settings mobile-config panel interactions with real admin login.",
+  "rca of the issue": "Repro: POST /api/ai/meal-plan without cookies/tokens returns 307 redirect to /login. Cause: middleware.ts applies admin session gate to nearly all paths, including mobile API endpoints, and does not exempt /api/ai/meal-plan. Mitigation: add API allowlist or matcher exclusions for mobile-consumed endpoints so route-level Supabase JWT checks can execute and return 401/403 appropriately.",
+  "mocked_integrations": "MOCKED: Google Sign-In native iOS flow is scaffolding-only. MOCKED: StoreKit purchase and ABA receipt upload remain stub/mock flows."
+}

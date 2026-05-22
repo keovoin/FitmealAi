@@ -10,7 +10,7 @@
 import SwiftUI
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case home, meals, workout, habits, progress
+    case home, meals, workout, habits, progress, settings
 
     var id: String { rawValue }
 
@@ -21,6 +21,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .workout:  return "Workout"
         case .habits:   return "Habits"
         case .progress: return "Progress"
+        case .settings: return "Settings"
         }
     }
 
@@ -31,6 +32,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .workout:  return "figure.strengthtraining.traditional"
         case .habits:   return "checkmark.circle.fill"
         case .progress: return "chart.line.uptrend.xyaxis"
+        case .settings: return "gearshape.fill"
         }
     }
 }

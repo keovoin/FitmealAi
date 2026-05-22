@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HomeDashboardView: View {
     @StateObject private var vm: HomeDashboardViewModel
+    @EnvironmentObject private var appState: AppState
 
     var onOpenMeals: (() -> Void)? = nil
     var onOpenWorkout: (() -> Void)? = nil
@@ -43,8 +44,14 @@ struct HomeDashboardView: View {
             if vm.showsUpgradeBanner {
                 upgradeBanner
             }
+            if let error = vm.errorMessage {
+                Text(error)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Colors.errorRed)
+            }
             regenerateButton
         }
+        .task { await vm.loadLiveProfile(authService: appState.authService) }
     }
 
     // MARK: - Sections
@@ -176,7 +183,7 @@ struct HomeDashboardView: View {
     private var regenerateButton: some View {
         PrimaryButton(title: "Regenerate today's plan", icon: "sparkles") {
             onRegenerateTapped?()
-            Task { await vm.regeneratePlan() }
+            Task { await vm.regeneratePlan(aiService: appState.aiService, mealPrefs: appState.preferencesStore.meal) }
         }
     }
 
@@ -257,10 +264,12 @@ private struct HabitProgressBar: View {
 
 #Preview("HomeDashboardView - Free") {
     HomeDashboardView(viewModel: HomeDashboardViewModel(tier: .free))
+        .environmentObject(AppState.preview)
         .preferredColorScheme(.dark)
 }
 
 #Preview("HomeDashboardView - Gold") {
     HomeDashboardView(viewModel: HomeDashboardViewModel(tier: .gold))
+        .environmentObject(AppState.preview)
         .preferredColorScheme(.dark)
 }

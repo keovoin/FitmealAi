@@ -16,129 +16,41 @@
 import SwiftUI
 
 struct RootView: View {
-    @State private var selected: ScreenEntry? = nil
+    @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        if let entry = selected {
-            ZStack(alignment: .topLeading) {
-                screen(for: entry)
-
-                Button {
-                    selected = nil
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Index")
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(.ultraThinMaterial))
-                    .overlay(Capsule().stroke(AppTheme.Colors.glassStroke, lineWidth: 1))
-                }
-                .buttonStyle(PressableScaleStyle())
-                .padding(.top, AppTheme.Spacing.small)
-                .padding(.leading, AppTheme.Spacing.small)
-            }
-            .transition(.opacity.combined(with: .move(edge: .trailing)))
-        } else {
-            indexScreen
-                .transition(.opacity)
-        }
-    }
-
-    // MARK: - Index
-
-    private var indexScreen: some View {
-        ScreenContainer(showGlows: true) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.xSmall) {
-                Text("FitMeal AI")
-                    .font(AppTheme.Typography.largeTitle)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                Text("Phase 2 . 17 screens . tap to preview")
-                    .font(AppTheme.Typography.body)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-            }
-
-            ForEach(ScreenSection.allCases) { section in
-                sectionBlock(section)
+        Group {
+            switch appState.rootFlow {
+            case .splash:
+                SplashView(onComplete: { appState.routeAfterSplash() })
+            case .login:
+                LoginView(
+                    onAuthenticated: { appState.routeAfterSplash() },
+                    onSignUpTapped: { appState.latestError = "Enter email and password, then tap Get started free again." }
+                )
+            case .onboardingGoal:
+                OnboardingGoalView(
+                    onContinue: { goal in appState.rememberGoal(goal) },
+                    onBack: { appState.rootFlow = .login }
+                )
+            case .onboardingWorkout:
+                OnboardingWorkoutView(
+                    store: appState.preferencesStore,
+                    onContinue: { prefs in appState.rememberWorkout(prefs) },
+                    onBack: { appState.rootFlow = .onboardingGoal }
+                )
+            case .onboardingMeal:
+                OnboardingMealView(
+                    store: appState.preferencesStore,
+                    onContinue: { prefs in Task { await appState.completeOnboarding(mealPrefs: prefs) } },
+                    onBack: { appState.rootFlow = .onboardingWorkout }
+                )
+            case .main:
+                MainTabView()
             }
         }
-    }
-
-    @ViewBuilder
-    private func sectionBlock(_ section: ScreenSection) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-            Text(section.title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(AppTheme.Colors.textTertiary)
-                .padding(.leading, AppTheme.Spacing.small)
-
-            VStack(spacing: AppTheme.Spacing.xSmall) {
-                ForEach(section.entries) { entry in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { selected = entry }
-                    } label: {
-                        HStack(spacing: AppTheme.Spacing.medium) {
-                            Image(systemName: entry.icon)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .background(Circle().fill(entry.tint))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(entry.title)
-                                    .font(AppTheme.Typography.headline)
-                                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                                Text(entry.subtitle)
-                                    .font(AppTheme.Typography.caption)
-                                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(AppTheme.Colors.textTertiary)
-                        }
-                        .padding(.horizontal, AppTheme.Spacing.medium)
-                        .padding(.vertical, AppTheme.Spacing.small + 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.chip, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.chip, style: .continuous)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(PressableScaleStyle())
-                }
-            }
-        }
-    }
-
-    // MARK: - Screen routing
-
-    @ViewBuilder
-    private func screen(for entry: ScreenEntry) -> some View {
-        switch entry {
-        case .splash:           SplashView()
-        case .login:            LoginView()
-        case .onboardingGoal:   OnboardingGoalView()
-        case .onboardingWorkout:OnboardingWorkoutView()
-        case .onboardingMeal:   OnboardingMealView()
-        case .aiGenerating:     AIGeneratingView(autoCompleteAfter: nil)
-        case .home:             HomeDashboardView()
-        case .mealPlan:         MealPlanView()
-        case .workout:          WorkoutView()
-        case .habits:           HabitsView()
-        case .progress:         ProgressDashboardView()
-        case .paywall:          PaywallView()
-        case .abaPayment:       ABAPaymentView()
-        case .paymentPending:   PaymentPendingView(request: MockData.pendingPayment)
-        case .settings:         SettingsView()
-        case .settingsMeal:     SettingsMealView()
-        case .settingsWorkout:  SettingsWorkoutView()
-        }
+        .task { await appState.bootstrap() }
+        .animation(.easeInOut(duration: 0.25), value: appState.rootFlow)
     }
 }
 
@@ -266,7 +178,8 @@ private enum ScreenSection: String, CaseIterable, Identifiable {
     }
 }
 
-#Preview("RootView - Phase 2 Index") {
+#Preview("RootView - Phase 4 Navigation") {
     RootView()
+        .environmentObject(AppState.preview)
         .preferredColorScheme(.dark)
 }

@@ -29,7 +29,7 @@ struct AuthCredentials: Hashable {
 
     var isSubmittable: Bool {
         switch mode {
-        case .email: return emailOrPhone.contains("@") && password.count >= 6
+        case .email: return emailOrPhone.contains("@") && password.count >= 8
         case .phone: return emailOrPhone.count >= 6
         }
     }

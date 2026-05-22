@@ -12,6 +12,7 @@ import SwiftUI
 
 struct MealPlanView: View {
     @StateObject private var vm: MealPlanViewModel
+    @EnvironmentObject private var appState: AppState
 
     var onUpgradeTapped: (() -> Void)? = nil
 
@@ -38,6 +39,27 @@ struct MealPlanView: View {
                     weeklyLockedCard
                 } else {
                     mealList
+                }
+
+                if let error = vm.errorMessage {
+                    Text(error)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Colors.errorRed)
+                }
+
+                PrimaryButton(
+                    title: vm.isRegenerating ? "Generating..." : "Regenerate today's plan",
+                    icon: "sparkles",
+                    isLoading: vm.isRegenerating
+                ) {
+                    Task {
+                        await vm.regenerateToday(
+                            aiService: appState.aiService,
+                            goal: MockData.user.goal,
+                            calorieTarget: MockData.user.dailyCalorieTarget,
+                            mealPrefs: appState.preferencesStore.meal
+                        )
+                    }
                 }
             }
 
@@ -146,7 +168,15 @@ struct MealPlanView: View {
 
                     HStack(spacing: AppTheme.Spacing.small) {
                         SecondaryGlassButton(title: "Replace", icon: "arrow.triangle.2.circlepath") {
-                            Task { await vm.replaceMeal(meal) }
+                            Task {
+                                await vm.replaceMeal(
+                                    meal,
+                                    aiService: appState.aiService,
+                                    goal: MockData.user.goal,
+                                    calorieTarget: MockData.user.dailyCalorieTarget,
+                                    mealPrefs: appState.preferencesStore.meal
+                                )
+                            }
                         }
                         SecondaryGlassButton(title: "Details", icon: "chevron.right") {
                             vm.inspect(meal)
@@ -188,10 +218,12 @@ struct MealPlanView: View {
 
 #Preview("MealPlanView - Free") {
     MealPlanView(viewModel: MealPlanViewModel(tier: .free))
+        .environmentObject(AppState.preview)
         .preferredColorScheme(.dark)
 }
 
 #Preview("MealPlanView - Gold") {
     MealPlanView(viewModel: MealPlanViewModel(tier: .gold))
+        .environmentObject(AppState.preview)
         .preferredColorScheme(.dark)
 }

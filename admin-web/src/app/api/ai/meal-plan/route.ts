@@ -1,6 +1,7 @@
 import { generateMealPlan } from "@/lib/ai/meal-plan-service";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { MealPlanRequestSchema } from "@/lib/ai/types";
+import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -14,8 +15,8 @@ export const maxDuration = 60;
  * POST /api/ai/meal-plan
  *
  * Generates (or reuses) a daily meal plan for the supplied user.
- * Phase 4b accepts user_id in the body. Phase 4c will add a real
- * auth header (Supabase JWT) and verify the user_id matches the JWT.
+ * Phase 4c requires a Supabase JWT in Authorization and verifies the
+ * body user_id matches the authenticated user.
  */
 export async function POST(req: Request) {
   if (!isSupabaseConfigured()) {
@@ -28,6 +29,25 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: false, error: "ai_not_configured" },
       { status: 503 },
+    );
+  }
+
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : null;
+  if (!token) {
+    return NextResponse.json(
+      { ok: false, error: "missing_authorization" },
+      { status: 401 },
+    );
+  }
+
+  const { data: authData, error: authError } = await getSupabaseAdmin().auth.getUser(token);
+  if (authError || !authData.user) {
+    return NextResponse.json(
+      { ok: false, error: "invalid_authorization" },
+      { status: 401 },
     );
   }
 
@@ -46,6 +66,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: false, error: "invalid_request", issues: parsed.error.flatten() },
       { status: 400 },
+    );
+  }
+
+  if (parsed.data.user_id !== authData.user.id) {
+    return NextResponse.json(
+      { ok: false, error: "user_mismatch" },
+      { status: 403 },
     );
   }
 

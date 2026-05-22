@@ -9,7 +9,6 @@ import {
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
 import {
   GeneratedMeal,
-  GeneratedMealSchema,
   GeneratedPlanSchema,
   MealPlanRequest,
   slugify,
@@ -130,7 +129,7 @@ export async function generateMealPlan(
   let parsed;
   try {
     parsed = GeneratedPlanSchema.parse(JSON.parse(rawText));
-  } catch (err) {
+  } catch {
     await logFailedGeneration(req.user_id, "meal_plan", textModel, "schema_invalid");
     return {
       ok: false,

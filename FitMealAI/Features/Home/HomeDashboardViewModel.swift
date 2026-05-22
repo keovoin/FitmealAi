@@ -20,6 +20,7 @@ final class HomeDashboardViewModel: ObservableObject {
     @Published private(set) var workout: WorkoutPlan
     @Published var habits: [Habit]
     @Published private(set) var tier: SubscriptionTier
+    @Published var errorMessage: String? = nil
 
     init(
         user: UserGoal = MockData.user,
@@ -100,7 +101,31 @@ final class HomeDashboardViewModel: ObservableObject {
     }
 
     /// Stub. Phase-3 will trigger AIService to regenerate the day's plan.
-    func regeneratePlan() async {
-        try? await Task.sleep(nanoseconds: 500_000_000)
+    func regeneratePlan(aiService: AIService? = nil, mealPrefs: MealPrefs = .default) async {
+        guard let aiService else {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            return
+        }
+
+        do {
+            mealPlan = try await aiService.generateTodayMealPlan(
+                goal: user.goal,
+                calorieTarget: user.dailyCalorieTarget,
+                mealPrefs: mealPrefs,
+                reuseToday: false
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadLiveProfile(authService: AuthService) async {
+        do {
+            guard let summary = try await authService.fetchProfileSummary() else { return }
+            user.name = summary.name
+            tier = summary.tier
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

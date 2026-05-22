@@ -28,6 +28,8 @@ final class MealPlanViewModel: ObservableObject {
     @Published private(set) var tomorrowPlan: MealPlan
     @Published private(set) var weeklyPlans: [MealPlan]
     @Published private(set) var tier: SubscriptionTier
+    @Published var isRegenerating: Bool = false
+    @Published var errorMessage: String? = nil
 
     init(
         todayPlan: MealPlan = MockData.todayMealPlan,
@@ -83,9 +85,30 @@ final class MealPlanViewModel: ObservableObject {
         inspectedMeal = nil
     }
 
-    /// Stub. Phase-3 will call AIService.replaceMeal(...).
-    func replaceMeal(_ meal: Meal) async {
-        try? await Task.sleep(nanoseconds: 300_000_000)
+    func regenerateToday(aiService: AIService, goal: FitnessGoal, calorieTarget: Int, mealPrefs: MealPrefs) async {
+        isRegenerating = true
+        errorMessage = nil
+        defer { isRegenerating = false }
+
+        do {
+            todayPlan = try await aiService.generateTodayMealPlan(
+                goal: goal,
+                calorieTarget: calorieTarget,
+                mealPrefs: mealPrefs,
+                reuseToday: false
+            )
+            selectedTab = .today
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func replaceMeal(_ meal: Meal, aiService: AIService? = nil, goal: FitnessGoal = MockData.user.goal, calorieTarget: Int = MockData.user.dailyCalorieTarget, mealPrefs: MealPrefs = .default) async {
+        guard let aiService else {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            return
+        }
+        await regenerateToday(aiService: aiService, goal: goal, calorieTarget: calorieTarget, mealPrefs: mealPrefs)
     }
 }
 

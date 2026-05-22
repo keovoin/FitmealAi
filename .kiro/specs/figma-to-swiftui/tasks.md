@@ -62,20 +62,20 @@
 - [ ] Admin "regenerate user's plan" tool (deferred to Phase 4c when we have user records)
 
 ## Phase 4c: iOS auth + AI integration
-- [ ] AuthService.swift with Supabase Auth (email + Apple + Google)
-- [ ] AIService.swift calling /api/ai/meal-plan
-- [ ] Connect LoginView, OnboardingMealView -> persist to Supabase
-- [ ] Connect HomeDashboardView -> live data from Supabase
-- [ ] Connect MealPlanView regenerate button to AIService
+- [x] AuthService.swift with Supabase Auth (email + Apple + Google ID-token hook)
+- [x] AIService.swift calling /api/ai/meal-plan with Supabase JWT
+- [x] Connect LoginView, OnboardingMealView -> persist to Supabase
+- [x] Connect HomeDashboardView -> live profile/tier data from Supabase
+- [x] Connect MealPlanView regenerate button to AIService
 
 ## Phase 4d: iOS navigation
-- [ ] Build real RootView router (replaces dev index)
-- [ ] Build MainTabView using BottomNav
-- [ ] Connect splash -> login -> onboarding flow
-- [ ] Connect dashboard -> meals/workout/habits/progress tabs
-- [ ] Connect paywall modal (from Home upgrade banner + Settings plan row)
-- [ ] Connect ABA payment flow (Paywall -> ABAPayment -> PaymentPending)
-- [ ] Connect Settings sub-screens (Meal / Workout)
+- [x] Build real RootView router (replaces dev index)
+- [x] Build MainTabView using BottomNav
+- [x] Connect splash -> login -> onboarding flow
+- [x] Connect dashboard -> meals/workout/habits/progress/settings tabs
+- [x] Connect paywall modal (from Home upgrade banner + Settings plan row)
+- [x] Connect ABA payment flow (Paywall -> ABAPayment -> PaymentPending)
+- [x] Connect Settings sub-screens (Meal / Workout)
 
 ## Phase 4e: Animation polish
 - [ ] Add card entrance animations

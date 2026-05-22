@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct FitMealAIApp: App {
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environmentObject(appState)
                 .preferredColorScheme(.dark) // v1: dark glass UI only
         }
     }

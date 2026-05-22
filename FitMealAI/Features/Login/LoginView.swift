@@ -8,9 +8,11 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     @StateObject private var vm = LoginViewModel()
+    @EnvironmentObject private var appState: AppState
 
     var onAuthenticated: (() -> Void)? = nil
     var onSignUpTapped: (() -> Void)? = nil
@@ -144,7 +146,10 @@ struct LoginView: View {
                     isDisabled: !vm.canSubmit
                 ) {
                     Task {
-                        if await vm.submit() { onAuthenticated?() }
+                        if let session = await vm.submit(authService: appState.authService) {
+                            appState.didAuthenticate(session)
+                            onAuthenticated?()
+                        }
                     }
                 }
                 .padding(.top, AppTheme.Spacing.xSmall)
@@ -166,13 +171,45 @@ struct LoginView: View {
         VStack(spacing: AppTheme.Spacing.small) {
             SecondaryGlassButton(title: "Continue with Google", icon: "g.circle.fill") {
                 Task {
-                    if await vm.socialSignIn(.google) { onAuthenticated?() }
+                    if let session = await vm.socialSignIn(.google) {
+                        appState.didAuthenticate(session)
+                        onAuthenticated?()
+                    }
                 }
             }
-            SecondaryGlassButton(title: "Continue with Apple", icon: "apple.logo") {
-                Task {
-                    if await vm.socialSignIn(.apple) { onAuthenticated?() }
-                }
+
+            ZStack {
+                SecondaryGlassButton(title: "Continue with Apple", icon: "apple.logo") {}
+                    .allowsHitTesting(false)
+
+                SignInWithAppleButton(
+                    .continue,
+                    onRequest: { request in vm.prepareAppleRequest(request) },
+                    onCompletion: { result in
+                        Task {
+                            if let session = await vm.completeAppleSignIn(result, authService: appState.authService) {
+                                appState.didAuthenticate(session)
+                                onAuthenticated?()
+                            }
+                        }
+                    }
+                )
+                .signInWithAppleButtonStyle(.whiteOutline)
+                .frame(height: 48)
+                .opacity(0.02)
+            }
+            .accessibilityLabel("Continue with Apple")
+            .accessibilityIdentifier("login-apple-button")
+        }
+    }
+
+    private func startRegistration() {
+        Task {
+            if let session = await vm.register(authService: appState.authService) {
+                appState.didAuthenticate(session)
+                onAuthenticated?()
+            } else {
+                onSignUpTapped?()
             }
         }
     }
@@ -183,7 +220,7 @@ struct LoginView: View {
                 Text("New to FitMeal?")
                     .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
-                Button("Get started free") { onSignUpTapped?() }
+                Button("Get started free") { startRegistration() }
                     .font(AppTheme.Typography.body.weight(.semibold))
                     .foregroundStyle(AppTheme.Colors.accentBlue)
             }
@@ -199,5 +236,6 @@ struct LoginView: View {
 
 #Preview("LoginView") {
     LoginView()
+        .environmentObject(AppState.preview)
         .preferredColorScheme(.dark)
 }

@@ -3,10 +3,13 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { MobileConfigPanel } from "./mobile-config-panel";
 
 export default function AdminSettingsPage() {
   const supabaseOn = isSupabaseConfigured();
   const aiOn = isAIConfigured();
+  const anonOn = Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   return (
     <PageShell
       title="Admin settings"
@@ -26,6 +29,35 @@ export default function AdminSettingsPage() {
           <div className="mt-3">
             <Badge tone="purple">Phase-3 stub</Badge>
           </div>
+        </GlassCard>
+
+        <GlassCard className="lg:col-span-2">
+          <p className="text-xs uppercase tracking-wider text-white/50">
+            iOS runtime config
+          </p>
+          <p data-testid="mobile-config-title" className="mt-1 text-base font-semibold text-white">
+            Supabase + API placeholders
+          </p>
+          <p className="mt-2 text-sm text-white/65">
+            Use this admin-only helper to insert or replace the iOS Info.plist
+            values. The anon key is public, but the service-role key must stay
+            server-only and should never be pasted into Xcode.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Badge tone={supabaseOn ? "green" : "outline"}>
+              Supabase URL {supabaseOn ? "ready" : "missing"}
+            </Badge>
+            <Badge tone={anonOn ? "green" : "outline"}>
+              Anon key {anonOn ? "ready" : "missing"}
+            </Badge>
+            <Badge tone={apiBaseUrl ? "green" : "outline"}>
+              API URL {apiBaseUrl ? "ready" : "missing"}
+            </Badge>
+          </div>
+          <MobileConfigPanel
+            initialSupabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}
+            initialAPIBaseUrl={apiBaseUrl}
+          />
         </GlassCard>
 
         <GlassCard>
