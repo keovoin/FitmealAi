@@ -3,7 +3,7 @@
 import { generateMealPlan } from "@/lib/ai/meal-plan-service";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { revalidatePath } from "next/cache";
-import { getSupabaseAdmin } from "./server";
+import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
 
 /**
  * Mark a pending payment as approved or rejected. The DB trigger
@@ -112,6 +112,10 @@ export async function compGold(userId: string) {
  * their saved Supabase onboarding preferences.
  */
 export async function regenerateUserMealPlan(userId: string) {
+  if (!isSupabaseConfigured()) {
+    return { ok: false as const, error: "Supabase is not configured." };
+  }
+
   if (!isAIConfigured()) {
     return { ok: false as const, error: "OPENAI_API_KEY is not configured." };
   }

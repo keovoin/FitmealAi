@@ -36,11 +36,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1.5 text-xs font-medium text-white/70">
+    <form data-testid="login-form" onSubmit={onSubmit} className="flex flex-col gap-3">
+      <label data-testid="login-password-label" className="flex flex-col gap-1.5 text-xs font-medium text-white/70">
         Admin password
         <div className="relative">
           <input
+            data-testid="login-password-input"
             type={showPassword ? "text" : "password"}
             autoFocus
             autoComplete="current-password"
@@ -50,6 +51,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             placeholder="••••••••"
           />
           <button
+            data-testid="login-password-toggle-button"
             type="button"
             onClick={() => setShowPassword((v) => !v)}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/50 hover:text-white"
@@ -61,12 +63,13 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       </label>
 
       {error && (
-        <p className="text-xs text-danger" role="alert">
+        <p data-testid="login-error-message" className="text-xs text-danger" role="alert">
           {error}
         </p>
       )}
 
       <Button
+        data-testid="login-submit-button"
         type="submit"
         size="lg"
         loading={loading}

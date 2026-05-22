@@ -25,6 +25,20 @@ export default async function DashboardPage() {
     return (
       <PageShell title="Dashboard" subtitle="An overview of FitMeal AI today">
         <ConfigureSupabaseBanner />
+        <div className="mt-4">
+          <GlassCard>
+            <p className="text-xs uppercase tracking-wider text-white/50">
+              Support tool
+            </p>
+            <p data-testid="dashboard-regenerate-title" className="text-base font-semibold text-white">
+              Regenerate a user&apos;s meal plan
+            </p>
+            <p className="mt-1 text-sm text-white/60">
+              This tool appears here for setup validation. It becomes usable after Supabase and AI envs are configured.
+            </p>
+            <DashboardRegenerateTool />
+          </GlassCard>
+        </div>
       </PageShell>
     );
   }
