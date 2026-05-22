@@ -43,9 +43,10 @@ Android A1 has now started. Continue cautiously: the iOS app still needs **Phase
 - ABA manual payment request flow matching iOS/admin records.
 
 ### A5 — QA
-- Pixel 8/9 emulator layout pass.
-- Offline/error states.
-- Auth/session regression tests.
+- [x] Add Gradle wrapper tooling and build verification script.
+- [ ] Pixel 8/9 emulator layout pass.
+- [ ] Offline/error states.
+- [ ] Auth/session regression tests.
 
 ## Best next step
 

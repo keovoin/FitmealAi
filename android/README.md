@@ -5,6 +5,7 @@ Android A1 foundation for the future FitMeal AI Android app.
 ## What is included
 
 - Kotlin + Jetpack Compose project shell.
+- Gradle wrapper tooling for repeatable local/CI builds.
 - Dark glass theme ported from the iOS `AppTheme` tokens.
 - Domain models for profile, meals, ingredients, meal plans, tiers, and goals.
 - Mock data matching the iOS preview concept.
@@ -30,6 +31,25 @@ FITMEAL_API_BASE_URL=...
 FITMEAL_GOOGLE_ANDROID_CLIENT_ID=...
 FITMEAL_GOOGLE_WEB_CLIENT_ID=...
 ```
+
+## Build verification
+
+This repo now includes a Gradle wrapper pinned to a modern Gradle version compatible with the Android Gradle Plugin used by the app.
+
+Requirements on your machine/CI:
+
+- JDK 17
+- Android SDK with API 35
+- `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
+
+Run:
+
+```bash
+cd android
+./scripts/verify-android-build.sh
+```
+
+In this workspace, Android build execution is blocked because Java/Android SDK are not installed, but the wrapper files and verification script are present.
 
 ## Recommended next Android phase
 
