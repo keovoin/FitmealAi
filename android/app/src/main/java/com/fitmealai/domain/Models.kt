@@ -26,12 +26,14 @@ data class Meal(
     val id: String,
     val type: MealType,
     val title: String,
+    val description: String? = null,
     val calories: Int,
     val proteinGrams: Int,
     val carbsGrams: Int,
     val fatGrams: Int,
     val imageUrl: String? = null,
     val ingredients: List<Ingredient> = emptyList(),
+    val recipeSteps: List<String> = emptyList(),
 )
 
 data class MealPlan(

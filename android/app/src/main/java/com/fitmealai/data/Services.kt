@@ -92,7 +92,7 @@ class PaymentRepository(private val config: AppConfig = AppConfig()) {
                 .put("tier", tier)
                 .put("amount", amount)
                 .put("transaction_id", transactionId)
-                .put("status", "submitted")
+                .put("status", "pending")
                 .put("submitted_at", java.time.OffsetDateTime.now().toString()),
             headers = mapOf(
                 "apikey" to config.supabaseAnonKey,
@@ -104,7 +104,7 @@ class PaymentRepository(private val config: AppConfig = AppConfig()) {
         return PaymentRequest(
             id = first.optString("id"),
             amountUsd = amount.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0,
-            status = first.optString("status", "submitted"),
+            status = first.optString("status", "pending"),
         )
     }
 }
@@ -140,6 +140,7 @@ private fun JSONObject.toMealPlan(): MealPlan {
             id = item.optString("meal_id", "meal-$index"),
             type = mealType(item.optString("meal_type", "snack")),
             title = item.optString("title", "Generated meal"),
+            description = item.optString("description").ifBlank { null },
             calories = item.optInt("calories", 0),
             proteinGrams = item.optInt("protein_g", 0),
             carbsGrams = item.optInt("carbs_g", 0),
@@ -157,6 +158,9 @@ private fun JSONObject.toMealPlan(): MealPlan {
                         fatGrams = ingredient.optInt("fat_g"),
                     )
                 }
+            } ?: emptyList(),
+            recipeSteps = item.optJSONArray("recipe_steps")?.let { steps ->
+                (0 until steps.length()).map { stepIndex -> steps.optString(stepIndex) }
             } ?: emptyList(),
         )
     }

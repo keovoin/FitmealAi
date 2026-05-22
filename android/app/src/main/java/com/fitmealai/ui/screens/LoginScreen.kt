@@ -22,14 +22,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitmealai.ui.components.GlassCard
 import com.fitmealai.ui.components.PrimaryGradientButton
+import com.fitmealai.ui.FitMealUiState
 import com.fitmealai.ui.theme.FitMealBrushes
 import com.fitmealai.ui.theme.FitMealColors
-import com.fitmealai.config.AppConfig
 
 @Composable
-fun LoginScreen(onContinue: () -> Unit) {
+fun LoginScreen(
+    state: FitMealUiState,
+    onEmailSignIn: (String, String) -> Unit,
+    onGoogleSignIn: () -> Unit,
+    onContinueOffline: () -> Unit,
+) {
     var email by remember { mutableStateOf("") }
-    val config = remember { AppConfig() }
+    var password by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -44,7 +49,7 @@ fun LoginScreen(onContinue: () -> Unit) {
         Spacer(Modifier.height(24.dp))
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                ConfigStatus(config)
+                ConfigStatus(state)
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -52,12 +57,33 @@ fun LoginScreen(onContinue: () -> Unit) {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("android-login-email-input"),
                 )
-                PrimaryGradientButton(title = "Continue", tag = "android-login-continue-button", onClick = onContinue)
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("android-login-password-input"),
+                )
+                if (state.message != null) {
+                    Text(state.message, color = FitMealColors.TextSecondary, modifier = Modifier.testTag("android-login-message"))
+                }
+                PrimaryGradientButton(
+                    title = if (state.isLoading) "Signing in..." else "Sign in",
+                    tag = "android-login-continue-button",
+                    enabled = !state.isLoading,
+                    onClick = { onEmailSignIn(email, password) },
+                )
                 PrimaryGradientButton(
                     title = "Continue with Google",
                     tag = "android-login-google-button",
-                    enabled = config.isGoogleReady,
-                    onClick = onContinue,
+                    enabled = !state.isLoading,
+                    onClick = onGoogleSignIn,
+                )
+                PrimaryGradientButton(
+                    title = "Preview UI without login",
+                    tag = "android-login-preview-button",
+                    enabled = !state.isLoading,
+                    onClick = onContinueOffline,
                 )
             }
         }
@@ -65,7 +91,8 @@ fun LoginScreen(onContinue: () -> Unit) {
 }
 
 @Composable
-private fun ConfigStatus(config: AppConfig) {
+private fun ConfigStatus(state: FitMealUiState) {
+    val config = state.config
     val text = when {
         config.isSupabaseReady && config.isApiReady -> "Live config detected"
         else -> "Add Supabase/API values in Gradle properties before live auth"

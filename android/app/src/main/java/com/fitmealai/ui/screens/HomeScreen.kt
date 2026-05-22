@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitmealai.data.MockData
 import com.fitmealai.domain.Meal
+import com.fitmealai.domain.MealPlan
+import com.fitmealai.ui.FitMealUiState
 import com.fitmealai.ui.components.GlassCard
 import com.fitmealai.ui.components.PrimaryGradientButton
 import com.fitmealai.ui.theme.FitMealBrushes
@@ -37,9 +39,13 @@ import com.fitmealai.config.AppConfig
 private enum class AndroidTab(val label: String) { Home("Home"), Meals("Meals"), Workout("Workout"), Habits("Habits"), Progress("Progress"), Settings("Settings") }
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    state: FitMealUiState,
+    onGenerateMealPlan: () -> Unit,
+    onSubmitPayment: () -> Unit,
+) {
     var selectedTab by remember { mutableStateOf(AndroidTab.Home) }
-    val config = remember { AppConfig() }
+    val config = state.config
 
     Column(
         modifier = Modifier
@@ -60,12 +66,17 @@ fun HomeScreen() {
                 Text("Hi ${MockData.user.name}, your FitMeal plan is ready.", color = FitMealColors.TextSecondary)
             }
             when (selectedTab) {
-                AndroidTab.Home -> homeContent(config)
-                AndroidTab.Meals -> mealsContent()
+                AndroidTab.Home -> homeContent(state, onSubmitPayment)
+                AndroidTab.Meals -> mealsContent(state.mealPlan, state.isLoading, onGenerateMealPlan)
                 AndroidTab.Workout -> workoutContent()
                 AndroidTab.Habits -> habitsContent()
                 AndroidTab.Progress -> progressContent()
-                AndroidTab.Settings -> settingsContent(config)
+                AndroidTab.Settings -> settingsContent(config, onSubmitPayment)
+            }
+            if (state.message != null) {
+                item {
+                    Text(state.message, color = FitMealColors.TextSecondary, modifier = Modifier.testTag("android-main-message"))
+                }
             }
         }
 
@@ -83,18 +94,24 @@ fun HomeScreen() {
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.homeContent(config: AppConfig) {
-    item { ConfigCard(config) }
-    item { SummaryCard() }
+private fun androidx.compose.foundation.lazy.LazyListScope.homeContent(state: FitMealUiState, onSubmitPayment: () -> Unit) {
+    item { ConfigCard(state.config) }
+    item { SummaryCard(state.mealPlan) }
     item { PaywallCard() }
-    items(MockData.mealPlan.meals.take(2)) { meal -> MealRow(meal) }
+    item { FeatureCard("ABA payment", "Submit a Gold payment request after sign-in.", "Submit payment", "android-home-payment-button", onSubmitPayment) }
+    items(state.mealPlan.meals.take(2)) { meal -> MealRow(meal) }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.mealsContent() {
-    item { SummaryCard() }
-    items(MockData.mealPlan.meals) { meal -> MealRow(meal) }
+private fun androidx.compose.foundation.lazy.LazyListScope.mealsContent(mealPlan: MealPlan, isLoading: Boolean, onGenerateMealPlan: () -> Unit) {
+    item { SummaryCard(mealPlan) }
+    items(mealPlan.meals) { meal -> MealRow(meal) }
     item {
-        PrimaryGradientButton(title = "Generate today's AI plan", tag = "android-meals-generate-button") {}
+        PrimaryGradientButton(
+            title = if (isLoading) "Generating..." else "Generate today's AI plan",
+            tag = "android-meals-generate-button",
+            enabled = !isLoading,
+            onClick = onGenerateMealPlan,
+        )
     }
 }
 
@@ -118,21 +135,21 @@ private fun androidx.compose.foundation.lazy.LazyListScope.progressContent() {
     item { FeatureCard("Body metrics", "Weight, photos, and habit streaks will sync after Supabase setup.", "Add metric", "android-progress-add-metric-button") }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.settingsContent(config: AppConfig) {
+private fun androidx.compose.foundation.lazy.LazyListScope.settingsContent(config: AppConfig, onSubmitPayment: () -> Unit) {
     item { ConfigCard(config) }
     item { FeatureCard("Meal preferences", "Diet, allergies, cook time, meal timing", "Edit meals", "android-settings-meals-button") }
     item { FeatureCard("Workout preferences", "Type, days, duration, equipment", "Edit workout", "android-settings-workout-button") }
-    item { FeatureCard("ABA payment", "Manual payment request and receipt upload will connect in A4.", "Open payment", "android-settings-payment-button") }
+    item { FeatureCard("ABA payment", "Submit a manual Gold payment request to Supabase.", "Submit payment", "android-settings-payment-button", onSubmitPayment) }
 }
 
 @Composable
-private fun SummaryCard() {
+private fun SummaryCard(mealPlan: MealPlan) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Today's plan", color = FitMealColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("${MockData.mealPlan.totalCalories} kcal", color = FitMealColors.TextSecondary)
-                Text("${MockData.mealPlan.totalProtein}g protein", color = FitMealColors.TextSecondary)
+                Text("${mealPlan.totalCalories} kcal", color = FitMealColors.TextSecondary)
+                Text("${mealPlan.totalProtein}g protein", color = FitMealColors.TextSecondary)
             }
         }
     }
@@ -170,12 +187,12 @@ private fun PaywallCard() {
 }
 
 @Composable
-private fun FeatureCard(title: String, subtitle: String, cta: String, tag: String) {
+private fun FeatureCard(title: String, subtitle: String, cta: String, tag: String, onClick: () -> Unit = {}) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, color = FitMealColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(subtitle, color = FitMealColors.TextSecondary)
-            PrimaryGradientButton(title = cta, tag = tag) {}
+            PrimaryGradientButton(title = cta, tag = tag, onClick = onClick)
         }
     }
 }
@@ -205,8 +222,12 @@ private fun MealRow(meal: Meal) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(meal.type.name, color = FitMealColors.AccentBlue, fontWeight = FontWeight.SemiBold)
             Text(meal.title, color = FitMealColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            meal.description?.let { Text(it, color = FitMealColors.TextSecondary) }
             Spacer(Modifier.height(2.dp))
             Text("${meal.calories} kcal • ${meal.proteinGrams}g protein", color = FitMealColors.TextSecondary)
+            if (meal.recipeSteps.isNotEmpty()) {
+                Text("${meal.recipeSteps.size} recipe steps", color = FitMealColors.TextSecondary)
+            }
         }
     }
 }
