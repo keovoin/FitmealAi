@@ -9,9 +9,11 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ABAPaymentView: View {
     @StateObject private var vm: ABAPaymentViewModel
+    @State private var pickerItem: PhotosPickerItem? = nil
 
     var onBack: (() -> Void)? = nil
     var onSubmitted: ((PaymentRequest) -> Void)? = nil
@@ -179,12 +181,20 @@ struct ABAPaymentView: View {
                         .stroke(AppTheme.Colors.successGreen.opacity(0.4), lineWidth: 1)
                 )
             } else {
-                Button(action: vm.attachScreenshotPlaceholder) {
+                PhotosPicker(
+                    selection: $pickerItem,
+                    matching: .images,
+                    photoLibrary: .shared(),
+                ) {
                     VStack(spacing: AppTheme.Spacing.xSmall) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: vm.isUploadingScreenshot
+                              ? "arrow.up.circle"
+                              : "square.and.arrow.up")
                             .font(.system(size: 22, weight: .semibold))
                             .foregroundStyle(AppTheme.Colors.accentPurple)
-                        Text("Tap to attach receipt")
+                        Text(vm.isUploadingScreenshot
+                             ? "Loading…"
+                             : "Tap to attach receipt")
                             .font(AppTheme.Typography.body)
                             .foregroundStyle(AppTheme.Colors.textPrimary)
                         Text("PNG / JPG up to 5 MB")
@@ -206,6 +216,21 @@ struct ABAPaymentView: View {
                     )
                 }
                 .buttonStyle(PressableScaleStyle())
+                .onChange(of: pickerItem) { _, newItem in
+                    guard let newItem else { return }
+                    Task {
+                        vm.isUploadingScreenshot = true
+                        defer { vm.isUploadingScreenshot = false }
+                        if let data = try? await newItem.loadTransferable(type: Data.self) {
+                            // PhotosPicker can return HEIC; stamp a sane MIME.
+                            let mime = (newItem.supportedContentTypes.first?.preferredMIMEType
+                                        ?? "image/jpeg")
+                            await MainActor.run {
+                                vm.setScreenshot(data: data, mimeType: mime)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

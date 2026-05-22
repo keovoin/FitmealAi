@@ -8,6 +8,8 @@ import com.fitmealai.data.AIRepository
 import com.fitmealai.data.AuthException
 import com.fitmealai.data.AuthRepository
 import com.fitmealai.data.AuthSession
+import com.fitmealai.data.BillingEvent
+import com.fitmealai.data.BillingHelper
 import com.fitmealai.data.GoogleSignInHelper
 import com.fitmealai.data.MockData
 import com.fitmealai.data.PaymentRepository
@@ -39,6 +41,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val googleSignInHelper = GoogleSignInHelper(config)
     val sessionStore = SessionStore(application)
     val preferencesStore = PreferencesStore(application)
+    val billingHelper = BillingHelper(application)
 
     private val _flow = MutableStateFlow(RootFlow.Splash)
     val flow: StateFlow<RootFlow> = _flow.asStateFlow()
@@ -65,10 +68,60 @@ class AppState(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             bootstrap()
         }
+        // Observe billing events from Play, propagating to our local
+        // tier state. The same flow handles Family-shared / Ask-to-Buy
+        // events that arrive outside the purchase UI.
+        viewModelScope.launch {
+            billingHelper.activeTier.collect { _tier.value = it }
+        }
+        viewModelScope.launch {
+            billingHelper.events.collect { event ->
+                when (event) {
+                    is BillingEvent.Purchased -> {
+                        _tier.value = event.tier
+                        _toast.value = "Welcome to FitMeal ${event.tier.displayName}!"
+                        _activeSheet.value = null
+                    }
+                    is BillingEvent.Error -> _toast.value = event.message
+                    BillingEvent.UserCanceled -> Unit
+                }
+            }
+        }
+    }
+
+    /**
+     * Initiates the Play Billing purchase flow for the given tier.
+     * Caller must pass the current Activity (Compose: LocalActivity).
+     */
+    fun purchaseTier(activity: android.app.Activity, tier: SubscriptionTier) {
+        viewModelScope.launch {
+            if (!billingHelper.ensureConnected()) {
+                _toast.value = "Google Play Billing is not available."
+                return@launch
+            }
+            billingHelper.launchPurchaseForTier(activity, tier)
+        }
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            billingHelper.refreshActiveTier()
+            _toast.value =
+                if (_tier.value == SubscriptionTier.Free)
+                    "No active subscription found."
+                else
+                    "Restored: FitMeal ${_tier.value.displayName}"
+        }
     }
 
     /** Splash → restore session → navigate. */
     private suspend fun bootstrap() {
+        // Pull current Play Billing entitlements in the background; if a user
+        // already has a subscription from a previous install we know it
+        // before the paywall appears.
+        viewModelScope.launch {
+            runCatching { billingHelper.refreshActiveTier() }
+        }
         val saved = sessionStore.load()
         if (saved == null) {
             _flow.value = RootFlow.Login

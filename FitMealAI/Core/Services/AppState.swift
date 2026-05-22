@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     let authService: AuthService
     let preferencesStore: PreferencesStore
     lazy var aiService = AIService(config: config, authService: authService)
+    let subscriptionManager: SubscriptionManager
 
     private let onboardingKey = "fitmeal_has_completed_onboarding"
     private var onboardingGoal: FitnessGoal = MockData.user.goal
@@ -57,11 +58,13 @@ final class AppState: ObservableObject {
     init(
         config: FitMealConfig = .current,
         authService: AuthService? = nil,
-        preferencesStore: PreferencesStore = PreferencesStore()
+        preferencesStore: PreferencesStore = PreferencesStore(),
+        subscriptionManager: SubscriptionManager? = nil
     ) {
         self.config = config
         self.preferencesStore = preferencesStore
         self.authService = authService ?? AuthService(config: config)
+        self.subscriptionManager = subscriptionManager ?? SubscriptionManager()
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
     }
 
@@ -83,6 +86,10 @@ final class AppState: ObservableObject {
             latestError = error.localizedDescription
             isAuthenticated = false
         }
+        // Refresh the StoreKit-resolved tier in parallel - we do this
+        // even when not authenticated so previews and offline launches
+        // still see Free as the default.
+        await subscriptionManager.refreshActiveTier()
     }
 
     func routeAfterSplash() {
