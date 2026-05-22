@@ -1,20 +1,38 @@
 import { GlassCard } from "@/components/ui/glass-card";
+import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { StatTile } from "@/components/ui/stat-tile";
 import { TierBadge } from "@/components/domain/tier-badge";
 import { PaymentStatusBadge } from "@/components/domain/payment-status-badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { getDashboardSnapshot } from "@/data/mock-dashboard";
-import { MOCK_PAYMENTS } from "@/data/mock-payments";
+import {
+  getDashboardSnapshotFromDb,
+  listPayments,
+} from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { relativeFromNow } from "@/lib/format";
 import { ArrowRight, CreditCard, TrendingUp, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { SignupsChart } from "./signups-chart";
 
-export default function DashboardPage() {
-  const snapshot = getDashboardSnapshot();
-  const recentPayments = [...MOCK_PAYMENTS]
+// Always render fresh; never cache the dashboard since it shows live counters.
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  if (!isSupabaseConfigured()) {
+    return (
+      <PageShell title="Dashboard" subtitle="An overview of FitMeal AI today">
+        <ConfigureSupabaseBanner />
+      </PageShell>
+    );
+  }
+
+  const [snapshot, allPayments] = await Promise.all([
+    getDashboardSnapshotFromDb(),
+    listPayments(),
+  ]);
+  const recentPayments = allPayments
     .filter((p) => p.status === "pending")
     .slice(0, 4);
 

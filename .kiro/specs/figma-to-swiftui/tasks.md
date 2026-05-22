@@ -35,7 +35,37 @@
 - [x] Build SettingsWorkoutView (+ ViewModel)
 - [x] Update RootView with Phase-2 dev screen index
 
-## Phase 3: Navigation
+## Phase 3a: Admin CMS scaffold (web)
+- [x] Next.js 15 + Tailwind + cookie auth + sidebar shell
+- [x] Dashboard, Payments queue, Users, Subscriptions, Settings (mock data)
+
+## Phase 4a: Database + admin wiring (Supabase)
+- [x] SQL migrations (extensions, profiles, prefs, meals, plans, habits, subs, payments, ai_generations, RLS, storage)
+- [x] `check_ai_rate_limit()` enforcing free 3+1/30min/20/day, silver 50/day, gold 100/day
+- [x] `upsert_meal_by_slug()` for the shared meal-image cache
+- [x] DB trigger `on_payment_approved`: bumps profile.tier and creates active subscription
+- [x] Server-only Supabase admin client + admin-queries module
+- [x] Replace MOCK_* on Dashboard, Payments, Users, Subscriptions with real queries
+- [x] Server Actions: reviewPayment, setUserStatus, compGold
+- [x] Graceful "Supabase not configured" empty state
+- [x] Steering file at `.kiro/steering/supabase.md`
+
+## Phase 4b: AI meal generation + image cache
+- [ ] `/api/ai/meal-plan` Vercel Function calling check_ai_rate_limit before each request
+- [ ] OpenAI structured-output prompt for meal title, recipe, ingredients, macros
+- [ ] Slug-based cache check in `meals` table; reuse if exists
+- [ ] On miss, generate image with OpenAI Images API, upload to `meal-images` bucket, save URL
+- [ ] Log every call to `ai_generations` (real or cached)
+- [ ] Admin "regenerate user's plan" tool
+
+## Phase 4c: iOS auth + AI integration
+- [ ] AuthService.swift with Supabase Auth (email + Apple + Google)
+- [ ] AIService.swift calling /api/ai/meal-plan
+- [ ] Connect LoginView, OnboardingMealView -> persist to Supabase
+- [ ] Connect HomeDashboardView -> live data from Supabase
+- [ ] Connect MealPlanView regenerate button to AIService
+
+## Phase 4d: iOS navigation
 - [ ] Build real RootView router (replaces dev index)
 - [ ] Build MainTabView using BottomNav
 - [ ] Connect splash -> login -> onboarding flow
@@ -43,10 +73,8 @@
 - [ ] Connect paywall modal (from Home upgrade banner + Settings plan row)
 - [ ] Connect ABA payment flow (Paywall -> ABAPayment -> PaymentPending)
 - [ ] Connect Settings sub-screens (Meal / Workout)
-- [ ] Wire AuthService stub
-- [ ] Wire AIService stub for plan generation / regeneration
 
-## Phase 4: Animation
+## Phase 4e: Animation polish
 - [ ] Add card entrance animations
 - [ ] Add button press animations (already implemented via PressableScaleStyle)
 - [ ] Add habit check animation (already implemented)

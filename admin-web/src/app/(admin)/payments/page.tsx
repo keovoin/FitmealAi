@@ -1,15 +1,19 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { PaymentStatusBadge } from "@/components/domain/payment-status-badge";
 import { TierBadge } from "@/components/domain/tier-badge";
-import { MOCK_PAYMENTS } from "@/data/mock-payments";
+import { listPayments } from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { relativeFromNow } from "@/lib/format";
 import type { AdminPayment, PaymentStatus } from "@/data/types";
 import { Inbox } from "lucide-react";
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 
 const STATUS_TABS: Array<{ key: PaymentStatus | "all"; label: string }> = [
   { key: "pending", label: "Pending" },
@@ -27,23 +31,29 @@ export default async function PaymentsPage({
   const statusFilter = (params.status as PaymentStatus | "all") ?? "pending";
   const query = (params.q ?? "").trim().toLowerCase();
 
-  const rows = MOCK_PAYMENTS.filter((p) => {
+  if (!isSupabaseConfigured()) {
+    return (
+      <PageShell title="Payments">
+        <ConfigureSupabaseBanner />
+      </PageShell>
+    );
+  }
+
+  const allPayments = await listPayments();
+  const rows = allPayments.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     if (!query) return true;
     return (
       p.userName.toLowerCase().includes(query) ||
       p.transactionId.toLowerCase().includes(query)
     );
-  }).sort(
-    (a, b) =>
-      new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-  );
+  });
 
   const counts = {
-    pending: MOCK_PAYMENTS.filter((p) => p.status === "pending").length,
-    approved: MOCK_PAYMENTS.filter((p) => p.status === "approved").length,
-    rejected: MOCK_PAYMENTS.filter((p) => p.status === "rejected").length,
-    all: MOCK_PAYMENTS.length,
+    pending: allPayments.filter((p) => p.status === "pending").length,
+    approved: allPayments.filter((p) => p.status === "approved").length,
+    rejected: allPayments.filter((p) => p.status === "rejected").length,
+    all: allPayments.length,
   } as const;
 
   return (

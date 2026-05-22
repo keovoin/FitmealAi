@@ -3,27 +3,43 @@
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import type { AdminPayment } from "@/data/types";
+import { reviewPayment } from "@/lib/supabase/admin-actions";
 import { Check, X } from "lucide-react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 
 /**
- * Local-only review actions. Phase-4 will POST to a real API; for now
- * we just flip local state so the admin can demo the flow end-to-end.
+ * Review actions backed by the `reviewPayment` Server Action. On approve,
+ * the database trigger `on_payment_approved` also bumps the user's tier
+ * and creates an active subscription row.
  */
 export function ReviewPanel({ payment }: { payment: AdminPayment }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
   const [status, setStatus] = useState(payment.status);
   const [note, setNote] = useState(payment.reviewerNote ?? "");
   const [submitting, setSubmitting] = useState<"approve" | "reject" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const isFinal = status === "approved" || status === "rejected";
   const missingScreenshot = !payment.screenshotFileName;
 
-  async function review(decision: "approve" | "reject") {
+  function review(decision: "approve" | "reject") {
+    setError(null);
     setSubmitting(decision);
-    // Simulate latency.
-    await new Promise((r) => setTimeout(r, 400));
-    setStatus(decision === "approve" ? "approved" : "rejected");
-    setSubmitting(null);
+    startTransition(async () => {
+      const result = await reviewPayment(payment.id, decision, note);
+      setSubmitting(null);
+      if (!result.ok) {
+        setError(result.error ?? "Could not save the decision");
+        return;
+      }
+      setStatus(decision === "approve" ? "approved" : "rejected");
+      // Pull fresh data from the server so the dashboard counts and the
+      // user's tier reflect immediately.
+      router.refresh();
+    });
   }
 
   return (
@@ -45,6 +61,12 @@ export function ReviewPanel({ payment }: { payment: AdminPayment }) {
       {missingScreenshot && status === "pending" && (
         <p className="mt-2 text-xs text-danger">
           No screenshot is attached. You can still reject directly.
+        </p>
+      )}
+
+      {error && (
+        <p className="mt-2 text-xs text-danger" role="alert">
+          {error}
         </p>
       )}
 
@@ -71,8 +93,7 @@ export function ReviewPanel({ payment }: { payment: AdminPayment }) {
 
       {isFinal && (
         <p className="mt-3 text-xs text-white/55">
-          Decision recorded locally. The backend will persist this in the
-          next phase.
+          Saved. The user&apos;s tier is updated automatically on approval.
         </p>
       )}
     </GlassCard>

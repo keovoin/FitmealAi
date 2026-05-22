@@ -10,6 +10,7 @@ This is a **monorepo** with three loosely-coupled folders:
 |---|---|---|
 | [`FitMealAI/`](./FitMealAI/) | iOS SwiftUI app (the production product) | Xcode 15+, iOS 17+. See [FitMealAI/README.md](./FitMealAI/README.md). |
 | [`admin-web/`](./admin-web/) | Next.js 15 admin CMS (internal-only web UI) | `cd admin-web && npm install && npm run dev`. See [admin-web/README.md](./admin-web/README.md). |
+| [`supabase/`](./supabase/) | SQL migrations for Postgres + Storage policies | Apply via Supabase SQL Editor. See [supabase/README.md](./supabase/README.md). |
 | `src/` (legacy) | React/Vite Figma Make export. Visual reference only. | `npm install && npm run dev`. Frozen — not the production app. |
 
 ## Folder ownership
@@ -31,7 +32,8 @@ To keep the iOS work safe from accidental overwrites, these paths are owned by s
 
 - **Phase 1** — Foundation (design system, models, mocks). Done.
 - **Phase 2** — All 17 iOS screens with MVVM and previews. Done.
-- **Phase 3a** — Admin CMS scaffold (this PR). Done.
-- **Phase 3b** — iOS navigation (real RootView router, MainTabView). Next.
-- **Phase 4** — Backend + real auth + persistence. Future.
+- **Phase 3a** — Admin CMS scaffold. Done.
+- **Phase 4a** — Supabase schema + admin wiring (this PR). Done.
+- **Phase 4b** — AI meal generation endpoint with rate limits + image caching. Next.
+- **Phase 4c** — iOS auth (Supabase) + AI service integration.
 - **Phase 5** — Android port (Jetpack Compose, reusing the same domain shapes).

@@ -1,6 +1,8 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { MOCK_PAYMENTS } from "@/data/mock-payments";
 import { isAuthenticated } from "@/lib/auth";
+import { getPendingPaymentsCount } from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -12,7 +14,18 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (!(await isAuthenticated())) {
     redirect("/login");
   }
-  const pendingPayments = MOCK_PAYMENTS.filter((p) => p.status === "pending").length;
+  // Pending count powers the sidebar badge. Fall back to mock count when
+  // Supabase isn't configured so the UI still looks right during setup.
+  let pendingPayments = 0;
+  if (isSupabaseConfigured()) {
+    try {
+      pendingPayments = await getPendingPaymentsCount();
+    } catch {
+      pendingPayments = 0;
+    }
+  } else {
+    pendingPayments = MOCK_PAYMENTS.filter((p) => p.status === "pending").length;
+  }
 
   return (
     <div className="flex min-h-screen">

@@ -1,18 +1,24 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { PaymentStatusBadge } from "@/components/domain/payment-status-badge";
 import { TierBadge } from "@/components/domain/tier-badge";
 import { UserStatusBadge } from "@/components/domain/user-status-badge";
-import { MOCK_PAYMENTS } from "@/data/mock-payments";
-import { MOCK_SUBSCRIPTIONS } from "@/data/mock-subscriptions";
-import { MOCK_USERS } from "@/data/mock-users";
+import {
+  getUserById,
+  listPaymentsByUserId,
+  listSubscriptionsByUserId,
+} from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { formatDateTime, relativeFromNow } from "@/lib/format";
 import { ChevronLeft, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { UserActions } from "./user-actions";
+
+export const dynamic = "force-dynamic";
 
 export default async function UserDetailPage({
   params,
@@ -20,13 +26,21 @@ export default async function UserDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const user = MOCK_USERS.find((u) => u.id === id);
-  if (!user) notFound();
 
-  const payments = MOCK_PAYMENTS.filter((p) => p.userId === id).sort(
-    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-  );
-  const subs = MOCK_SUBSCRIPTIONS.filter((s) => s.userId === id);
+  if (!isSupabaseConfigured()) {
+    return (
+      <PageShell title="User">
+        <ConfigureSupabaseBanner />
+      </PageShell>
+    );
+  }
+
+  const [user, payments, subs] = await Promise.all([
+    getUserById(id),
+    listPaymentsByUserId(id),
+    listSubscriptionsByUserId(id),
+  ]);
+  if (!user) notFound();
 
   return (
     <PageShell
@@ -77,23 +91,13 @@ export default async function UserDetailPage({
               <Cell label="Last active" value={formatDateTime(user.lastActiveAt)} />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm">
-                Comp Gold (1mo)
-              </Button>
-              {user.status === "active" ? (
-                <Button variant="danger" size="sm">
-                  Suspend
-                </Button>
-              ) : (
-                <Button variant="success" size="sm">
-                  Reactivate
-                </Button>
-              )}
+            <div className="mt-4">
+              <UserActions
+                userId={user.id}
+                status={user.status}
+                tier={user.tier}
+              />
             </div>
-            <p className="mt-2 text-[11px] text-white/40">
-              Actions are local-only until the backend lands.
-            </p>
           </GlassCard>
 
           <GlassCard>

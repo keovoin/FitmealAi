@@ -1,14 +1,18 @@
 import { Avatar } from "@/components/ui/avatar";
+import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { TierBadge } from "@/components/domain/tier-badge";
 import { UserStatusBadge } from "@/components/domain/user-status-badge";
-import { MOCK_USERS } from "@/data/mock-users";
+import { listUsers } from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { relativeFromNow } from "@/lib/format";
 import type { AdminUser, SubscriptionTier, UserStatus } from "@/data/types";
 import { Inbox } from "lucide-react";
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 
 const TIER_TABS: Array<{ key: SubscriptionTier | "all"; label: string }> = [
   { key: "all", label: "All" },
@@ -27,7 +31,16 @@ export default async function UsersPage({
   const statusFilter = (params.status as UserStatus | "all") ?? "all";
   const query = (params.q ?? "").trim().toLowerCase();
 
-  const rows = MOCK_USERS.filter((u) => {
+  if (!isSupabaseConfigured()) {
+    return (
+      <PageShell title="Users">
+        <ConfigureSupabaseBanner />
+      </PageShell>
+    );
+  }
+
+  const allUsers = await listUsers();
+  const rows = allUsers.filter((u) => {
     if (tierFilter !== "all" && u.tier !== tierFilter) return false;
     if (statusFilter !== "all" && u.status !== statusFilter) return false;
     if (!query) return true;

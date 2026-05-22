@@ -1,15 +1,18 @@
 import { Avatar } from "@/components/ui/avatar";
+import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { PaymentStatusBadge } from "@/components/domain/payment-status-badge";
 import { TierBadge } from "@/components/domain/tier-badge";
-import { MOCK_PAYMENTS } from "@/data/mock-payments";
-import { MOCK_USERS } from "@/data/mock-users";
+import { getPaymentById, getUserById } from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/format";
 import { ChevronLeft, ImageIcon, Mail } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReviewPanel } from "./review-panel";
+
+export const dynamic = "force-dynamic";
 
 export default async function PaymentDetailPage({
   params,
@@ -17,10 +20,19 @@ export default async function PaymentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const payment = MOCK_PAYMENTS.find((p) => p.id === id);
+
+  if (!isSupabaseConfigured()) {
+    return (
+      <PageShell title="Payment">
+        <ConfigureSupabaseBanner />
+      </PageShell>
+    );
+  }
+
+  const payment = await getPaymentById(id);
   if (!payment) notFound();
 
-  const user = MOCK_USERS.find((u) => u.id === payment.userId);
+  const user = await getUserById(payment.userId);
 
   return (
     <PageShell
