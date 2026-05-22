@@ -103,7 +103,7 @@ If `ADMIN_PASSWORD` is missing or too short on a production deployment, the admi
 
 Every time we push code to `main`, Vercel auto-deploys. You don't need to do anything.
 
-For the next phase (real AI meal generation), you'll just need to:
+For AI meal generation, make sure these env vars are set:
 1. Get an OpenAI API key
 2. Add `OPENAI_API_KEY` to Vercel env vars
 3. Push the code

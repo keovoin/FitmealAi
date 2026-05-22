@@ -19,6 +19,17 @@ export const maxDuration = 60;
  * body user_id matches the authenticated user.
  */
 export async function POST(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : null;
+  if (!token) {
+    return NextResponse.json(
+      { ok: false, error: "missing_authorization" },
+      { status: 401 },
+    );
+  }
+
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { ok: false, error: "supabase_not_configured" },
@@ -29,17 +40,6 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: false, error: "ai_not_configured" },
       { status: 503 },
-    );
-  }
-
-  const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : null;
-  if (!token) {
-    return NextResponse.json(
-      { ok: false, error: "missing_authorization" },
-      { status: 401 },
     );
   }
 

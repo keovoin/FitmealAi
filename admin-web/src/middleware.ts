@@ -4,7 +4,13 @@ import { NextResponse, type NextRequest } from "next/server";
 // the small constants file instead.
 import { ADMIN_COOKIE } from "@/lib/auth-constants";
 
-const PUBLIC_PATHS = ["/login", "/api/login", "/api/logout"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/login",
+  "/api/logout",
+  // Mobile/API routes validate Supabase JWTs in their own handlers.
+  "/api/ai/meal-plan",
+];
 
 /**
  * Cheap presence check at the edge. The layout in app/(admin)/layout.tsx
