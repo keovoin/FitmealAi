@@ -44,6 +44,7 @@ You **must** set this one to log in:
 | Name | Value | Environment |
 |---|---|---|
 | `ADMIN_PASSWORD` | a password you choose, **at least 8 characters** | All |
+| `ADMIN_SESSION_SECRET` | a random string, **at least 32 characters** (Required for Vercel) | All |
 
 If `ADMIN_PASSWORD` is unset or shorter than 8 chars on a production deployment, the admin will refuse all login attempts. (In local dev it falls back to a development-only password and prints a warning.)
 

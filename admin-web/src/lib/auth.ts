@@ -39,8 +39,28 @@ interface AdminConfig {
 let cached: AdminConfig | null = null;
 let processSecret: string | null = null;
 
+/**
+ * Security hardening: In serverless environments (Vercel), process-local
+ * secrets cause session loss on cold starts or when requests hit different
+ * instances. We prioritize a stable secret from the environment.
+ */
 function getProcessSecret(): string {
   if (processSecret) return processSecret;
+
+  // 1. Prioritize a stable secret from environment for serverless persistence.
+  const envSecret = process.env.ADMIN_SESSION_SECRET;
+  if (envSecret && envSecret.length >= 32) {
+    processSecret = envSecret;
+    return processSecret;
+  }
+
+  // 2. Fallback to random for local dev or if env secret is missing/weak.
+  if (process.env.NODE_ENV === "production") {
+    console.warn(
+      "[admin-auth] ADMIN_SESSION_SECRET is missing or too short in production. " +
+        "Sessions will be ephemeral and may cause login-redirect loops on Vercel.",
+    );
+  }
   processSecret = randomBytes(32).toString("hex");
   return processSecret;
 }
