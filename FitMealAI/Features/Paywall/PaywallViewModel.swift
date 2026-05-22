@@ -4,8 +4,9 @@
 //
 //  Owns the paywall plan list and the user's current selection.
 //  Wires through SubscriptionManager for real StoreKit 2 purchase
-//  + restore. Falls back to a stub when no SubscriptionManager is
-//  injected (preview / unit tests).
+//  + restore. Calls PaymentOptionsService to find out which payment
+//  methods (ABA / KHQR) are available for the current user before
+//  rendering the secondary actions.
 //
 
 import Foundation
@@ -20,17 +21,21 @@ final class PaywallViewModel: ObservableObject {
     @Published private(set) var isRestoring: Bool = false
     @Published private(set) var isLoadingProducts: Bool = false
     @Published var errorMessage: String? = nil
+    @Published private(set) var paymentOptions: PaymentOptions = .unavailable
 
     private let subscriptionManager: SubscriptionManager?
+    private let paymentOptionsService: PaymentOptionsService?
 
     init(
         plans: [SubscriptionPlan] = MockData.plans,
         defaultSelection: SubscriptionTier = .gold,
-        subscriptionManager: SubscriptionManager? = nil
+        subscriptionManager: SubscriptionManager? = nil,
+        paymentOptionsService: PaymentOptionsService? = nil
     ) {
         self.plans = plans
         self.selectedTier = defaultSelection
         self.subscriptionManager = subscriptionManager
+        self.paymentOptionsService = paymentOptionsService
     }
 
     // MARK: - Derived
@@ -46,6 +51,17 @@ final class PaywallViewModel: ObservableObject {
         case .silver: return "Subscribe to Silver"
         case .gold:   return "Subscribe to Gold"
         }
+    }
+
+    /// Whether to show the "Pay with ABA (manual)" secondary button.
+    /// True only when the admin has the toggle on AND the caller's
+    /// resolved country is on the allow-list.
+    var isAbaPaymentAvailable: Bool {
+        // Default-true for previews so the SwiftUI #Preview still renders
+        // both buttons; the live path overrides this once the options
+        // service has responded.
+        guard paymentOptionsService != nil else { return true }
+        return paymentOptions.aba_payment.available_for_user
     }
 
     // MARK: - Intents
@@ -64,6 +80,14 @@ final class PaywallViewModel: ObservableObject {
         if let err = manager.loadError {
             errorMessage = err
         }
+    }
+
+    /// Refreshes the per-user payment availability flags. Safe to call
+    /// multiple times; the server endpoint is uncached.
+    func refreshPaymentOptions() async {
+        guard let service = paymentOptionsService else { return }
+        let next = await service.fetch()
+        paymentOptions = next
     }
 
     /// Initiates the StoreKit 2 purchase flow. Returns true on success.

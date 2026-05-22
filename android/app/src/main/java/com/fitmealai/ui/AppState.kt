@@ -12,6 +12,7 @@ import com.fitmealai.data.BillingEvent
 import com.fitmealai.data.BillingHelper
 import com.fitmealai.data.GoogleSignInHelper
 import com.fitmealai.data.MockData
+import com.fitmealai.data.PaymentOptionsService
 import com.fitmealai.data.PaymentRepository
 import com.fitmealai.data.PreferencesStore
 import com.fitmealai.data.SessionStore
@@ -38,6 +39,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val authRepository = AuthRepository(config)
     val aiRepository = AIRepository(config)
     val paymentRepository = PaymentRepository(config)
+    val paymentOptionsService = PaymentOptionsService(config)
     val googleSignInHelper = GoogleSignInHelper(config)
     val sessionStore = SessionStore(application)
     val preferencesStore = PreferencesStore(application)
@@ -60,6 +62,11 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     private val _toast = MutableStateFlow<String?>(null)
     val toast: StateFlow<String?> = _toast.asStateFlow()
+
+    private val _paymentOptions =
+        MutableStateFlow(PaymentOptionsService.Options.Unavailable)
+    val paymentOptions: StateFlow<PaymentOptionsService.Options> =
+        _paymentOptions.asStateFlow()
 
     private var pendingGoal: FitnessGoal = MockData.user.goal
     private var pendingWorkout: WorkoutPrefs = WorkoutPrefs.Default
@@ -111,6 +118,17 @@ class AppState(application: Application) : AndroidViewModel(application) {
                     "No active subscription found."
                 else
                     "Restored: FitMeal ${_tier.value.displayName}"
+        }
+    }
+
+    /**
+     * Refreshes per-user payment availability (ABA toggle + region match).
+     * Called when the paywall opens; result is consumed by PaywallScreen
+     * to hide the "Pay with ABA" button outside Cambodia.
+     */
+    fun refreshPaymentOptions() {
+        viewModelScope.launch {
+            _paymentOptions.value = paymentOptionsService.fetch()
         }
     }
 

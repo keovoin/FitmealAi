@@ -4,7 +4,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { MobileConfigPanel } from "./mobile-config-panel";
-import { Stethoscope } from "lucide-react";
+import { DocLink } from "@/components/ui/doc-link";
+import { Banknote, Stethoscope } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminSettingsPage() {
@@ -17,13 +18,22 @@ export default function AdminSettingsPage() {
       title="Admin settings"
       subtitle="Tools and integrations the admin uses."
       actions={
-        <Link
-          href="/setup"
-          className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
-        >
-          <Stethoscope className="h-3.5 w-3.5" />
-          Setup health check
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/payment-settings"
+            className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+          >
+            <Banknote className="h-3.5 w-3.5" />
+            Payment settings
+          </Link>
+          <Link
+            href="/setup"
+            className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+          >
+            <Stethoscope className="h-3.5 w-3.5" />
+            Setup health check
+          </Link>
+        </div>
       }
     >
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -37,8 +47,12 @@ export default function AdminSettingsPage() {
             {" "}in your environment to rotate. We&apos;ll move this to SSO once
             real admin accounts are needed.
           </p>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone="purple">Phase-3 stub</Badge>
+            <DocLink
+              href="https://vercel.com/docs/projects/environment-variables"
+              label="Vercel env vars"
+            />
           </div>
         </GlassCard>
 
@@ -65,6 +79,18 @@ export default function AdminSettingsPage() {
               API URL {apiBaseUrl ? "ready" : "missing"}
             </Badge>
             <Badge tone="outline">Google fields manual</Badge>
+            <DocLink
+              href="https://app.supabase.com/"
+              label="Supabase dashboard"
+            />
+            <DocLink
+              href="https://console.cloud.google.com/apis/credentials"
+              label="Google Cloud credentials"
+            />
+            <DocLink
+              href="https://developer.apple.com/documentation/bundleresources/information_property_list"
+              label="Info.plist reference"
+            />
           </div>
           <MobileConfigPanel
             initialSupabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}
@@ -84,10 +110,18 @@ export default function AdminSettingsPage() {
               ? "All users, payments, and subscriptions read from Supabase via the service role. Approve/reject decisions persist immediately and the user's tier auto-updates."
               : "Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel env vars to switch to the live database."}
           </p>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={supabaseOn ? "green" : "outline"}>
               {supabaseOn ? "Connected" : "Not configured"}
             </Badge>
+            <DocLink
+              href="https://app.supabase.com/project/_/settings/api"
+              label="Get Supabase keys"
+            />
+            <DocLink
+              href="https://supabase.com/docs/guides/auth/row-level-security"
+              label="RLS docs"
+            />
           </div>
         </GlassCard>
 
@@ -103,11 +137,42 @@ export default function AdminSettingsPage() {
               ? "POST /api/ai/meal-plan generates structured meals, dedupes by title slug, and caches images in the meal-images bucket."
               : "Set OPENAI_API_KEY in Vercel env vars to enable meal generation."}
           </p>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={aiOn ? "green" : "outline"}>
               {aiOn ? "Connected" : "Not configured"}
             </Badge>
             <Badge tone="blue">Rate-limited per tier</Badge>
+            <DocLink
+              href="https://platform.openai.com/api-keys"
+              label="Create OpenAI API key"
+            />
+            <DocLink
+              href="https://platform.openai.com/usage"
+              label="Usage dashboard"
+            />
+          </div>
+        </GlassCard>
+
+        <GlassCard>
+          <p className="text-xs uppercase tracking-wider text-white/50">
+            Payments
+          </p>
+          <p className="mt-1 text-base font-semibold text-white">
+            ABA toggle, KHQR providers, Store billing
+          </p>
+          <p className="mt-2 text-sm text-white/65">
+            Toggle the manual ABA flow on/off, restrict it to specific
+            countries (Cambodia by default), and review the configured
+            KHQR provider.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Link
+              href="/payment-settings"
+              className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+            >
+              <Banknote className="h-3 w-3" />
+              Open payment settings
+            </Link>
           </div>
         </GlassCard>
 
@@ -122,8 +187,16 @@ export default function AdminSettingsPage() {
             Coming with the iOS auth wiring. Approval triggers do not yet
             push a notification to the user&apos;s device.
           </p>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone="outline">Planned</Badge>
+            <DocLink
+              href="https://developer.apple.com/documentation/usernotifications"
+              label="Apple Push Notifications"
+            />
+            <DocLink
+              href="https://firebase.google.com/docs/cloud-messaging"
+              label="Firebase Cloud Messaging"
+            />
           </div>
         </GlassCard>
       </div>

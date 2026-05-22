@@ -60,7 +60,8 @@ struct MainTabView: View {
         case .paywall:
             PaywallView(
                 viewModel: PaywallViewModel(
-                    subscriptionManager: appState.subscriptionManager
+                    subscriptionManager: appState.subscriptionManager,
+                    paymentOptionsService: appState.paymentOptionsService
                 ),
                 onClose: { appState.activeSheet = nil },
                 onPurchased: { appState.activeSheet = nil },
