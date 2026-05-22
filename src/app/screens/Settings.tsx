@@ -53,8 +53,8 @@ export function Settings() {
           <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" alt="Profile" className="w-full h-full rounded-full object-cover" />
         </div>
         <div className="flex-1">
-          <h2 className="text-lg font-bold">Chyvoin</h2>
-          <p className="text-sm text-white/60">chyvoin@example.com</p>
+          <h2 className="text-lg font-bold">Demo User</h2>
+          <p className="text-sm text-white/60">demo@example.com</p>
         </div>
         <button className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/70 hover:bg-white/10 hover:text-white transition-colors">
           <User size={20} />

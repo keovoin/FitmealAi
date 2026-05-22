@@ -39,15 +39,15 @@ Once you set the Root Directory to `admin-web`, Vercel will auto-detect **Next.j
 
 Open the **Environment Variables** section on the same page.
 
-Add ONE variable:
+You **must** set this one to log in:
 
 | Name | Value | Environment |
 |---|---|---|
-| `ADMIN_PASSWORD` | a password you choose, e.g. `my-strong-password-123` | All |
+| `ADMIN_PASSWORD` | a password you choose, **at least 8 characters** | All |
 
-Without this, the admin will use the default password `fitmeal-admin`. Set your own so only you can log in.
+If `ADMIN_PASSWORD` is unset or shorter than 8 chars on a production deployment, the admin will refuse all login attempts. (In local dev it falls back to a development-only password and prints a warning.)
 
-> **You can also add `OPENAI_API_KEY`, `SUPABASE_URL`, etc. here later** — same place, no code changes needed.
+> **You can also add `OPENAI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, etc. here later** — same place, no code changes needed.
 
 ## Step 6 — Click Deploy
 
@@ -95,7 +95,9 @@ Same as above: Root Directory is set to `./` instead of `admin-web`. Fix by chan
 
 ### "The login page works but I can't log in"
 
-Make sure you set `ADMIN_PASSWORD` in Vercel env vars, and that the password you're typing matches it exactly. Also note env var changes only take effect on a **new** deployment - go to Deployments, click Redeploy after changing env vars.
+Make sure you set `ADMIN_PASSWORD` (at least 8 characters) in Vercel env vars, and that the password you're typing matches it exactly. Also note env var changes only take effect on a **new** deployment - go to Deployments, click Redeploy after changing env vars.
+
+If `ADMIN_PASSWORD` is missing or too short on a production deployment, the admin will reject ALL login attempts and log an error to the Vercel function logs. Check the deployment logs to confirm.
 
 ## After deployment
 
