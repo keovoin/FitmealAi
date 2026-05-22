@@ -43,13 +43,43 @@ export default async function DashboardPage() {
     );
   }
 
-  const [snapshot, allPayments] = await Promise.all([
-    getDashboardSnapshotFromDb(),
-    listPayments(),
-  ]);
-  const recentPayments = allPayments
-    .filter((p) => p.status === "pending")
-    .slice(0, 4);
+  let snapshot;
+  let recentPayments = [];
+
+  try {
+    const [snapshotRes, allPayments] = await Promise.all([
+      getDashboardSnapshotFromDb(),
+      listPayments(),
+    ]);
+    snapshot = snapshotRes;
+    recentPayments = allPayments
+      .filter((p) => p.status === "pending")
+      .slice(0, 4);
+  } catch (error) {
+    console.error("Dashboard data fetch error:", error);
+    // Fallback to empty/error state if data fetching fails
+    return (
+      <PageShell title="Dashboard" subtitle="An overview of FitMeal AI today">
+        <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+          <p className="font-semibold">Unable to load dashboard data</p>
+          <p className="mt-1 text-sm opacity-80">
+            This usually means the Supabase tables are not yet created or the connection is failing. 
+            Please ensure you have run the migrations in your Supabase project.
+          </p>
+          {process.env.NODE_ENV !== "production" && (
+            <p className="mt-2 text-xs font-mono">{(error as Error).message}</p>
+          )}
+        </div>
+        <div className="mt-4">
+          <GlassCard>
+            <p className="text-xs uppercase tracking-wider text-white/50">Support tool</p>
+            <p className="text-base font-semibold text-white">Regenerate a user&apos;s meal plan</p>
+            <DashboardRegenerateTool />
+          </GlassCard>
+        </div>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell title="Dashboard" subtitle="An overview of FitMeal AI today">

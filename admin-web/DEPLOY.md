@@ -49,6 +49,8 @@ You **must** set this one to log in:
 If `ADMIN_PASSWORD` is unset or shorter than 8 chars on a production deployment, the admin will refuse all login attempts. (In local dev it falls back to a development-only password and prints a warning.)
 
 > **You can also add `OPENAI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, etc. here later** — same place, no code changes needed.
+> 
+> **Note on Supabase:** Ensure you have applied the SQL migrations in the `supabase/migrations` folder to your Supabase project before logging in, otherwise the dashboard may show an error.
 
 ## Step 6 — Click Deploy
 
