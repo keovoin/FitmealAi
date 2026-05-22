@@ -35,21 +35,7 @@
 - [x] Build SettingsWorkoutView (+ ViewModel)
 - [x] Update RootView with Phase-2 dev screen index
 
-## Phase 3a: Admin CMS (web)
-- [x] Scaffold Next.js 15 project under `admin-web/`
-- [x] Tailwind config mirroring iOS AppTheme tokens
-- [x] Single-password auth gate (cookie + middleware)
-- [x] Sidebar shell with active state and pending-payment badge
-- [x] Dashboard: KPIs, signups chart, plan-mix, pending-payments queue
-- [x] Payments: list with status tabs + search, detail with approve/reject
-- [x] Users: list with tier+status filters + search, detail with payment history
-- [x] Subscriptions: list with MRR rollup
-- [x] Settings: status of stub auth + planned features
-- [x] Mock data fixtures shaped to match iOS Core/Models
-- [x] Steering file at `.kiro/steering/admin-web.md`
-- [x] Root README explaining monorepo layout
-
-## Phase 3b: iOS Navigation
+## Phase 3: Navigation
 - [ ] Build real RootView router (replaces dev index)
 - [ ] Build MainTabView using BottomNav
 - [ ] Connect splash -> login -> onboarding flow
