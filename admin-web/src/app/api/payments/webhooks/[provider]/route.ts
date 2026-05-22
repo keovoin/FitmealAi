@@ -40,7 +40,7 @@ export async function POST(
   let providerImpl;
   try {
     providerImpl = getPaymentProvider(provider as PaymentProviderId);
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "provider_unavailable" }, { status: 503 });
   }
 

@@ -188,7 +188,7 @@ async function loadBakongKhqr(): Promise<BakongKhqrModule> {
     const mod = (await import("bakong-khqr")) as any;
     cached = (mod.default ?? mod) as BakongKhqrModule;
     return cached;
-  } catch (e) {
+  } catch {
     throw new Error(
       "The 'bakong-khqr' npm package is not installed. " +
         "Run: npm install bakong-khqr  (in the admin-web directory).",

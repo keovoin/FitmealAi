@@ -110,7 +110,7 @@ export default function AdminError({
                 </code>{" "}
                 from <code>0001</code> through <code>0013</code> in order.
               </li>
-              <li>Click "Try again" above.</li>
+              <li>Click &ldquo;Try again&rdquo; above.</li>
             </ol>
           </GlassCard>
         )}

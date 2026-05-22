@@ -182,6 +182,7 @@ export class AbaPayWayProvider implements PaymentProvider {
    */
   async verifyWebhook(
     rawBody: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _headers: Record<string, string>,
   ): Promise<
     | { providerSessionId: string; status: PaymentSessionStatus; raw: unknown }
