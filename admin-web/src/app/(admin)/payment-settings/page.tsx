@@ -1,13 +1,11 @@
-import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAbaPaymentSettings } from "@/lib/supabase/app-settings";
-import { getProviderConfigSnapshot } from "@/lib/payments/factory";
 import { DocLink } from "@/components/ui/doc-link";
 import { AbaPaymentToggle } from "./aba-payment-toggle";
-import { Banknote, CreditCard, Globe, Wallet } from "lucide-react";
+import { Banknote, Globe, Wallet } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +20,11 @@ export default async function PaymentSettingsPage() {
   }
 
   const aba = await getAbaPaymentSettings();
-  const providers = getProviderConfigSnapshot();
 
   return (
     <PageShell
       title="Payment settings"
-      subtitle="Toggle the manual ABA flow, set the regions where it shows, and review the configured KHQR providers."
+      subtitle="Toggle the manual ABA flow and set the regions where it shows."
     >
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {/* ABA enable/disable + region picker -------------------------------*/}
@@ -65,56 +62,6 @@ export default async function PaymentSettingsPage() {
           />
         </GlassCard>
 
-        {/* KHQR provider snapshot -----------------------------------------*/}
-        <GlassCard className="lg:col-span-2" data-testid="khqr-providers-card">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-white/50">
-                KHQR gateways
-              </p>
-              <p className="mt-1 text-base font-semibold text-white">
-                Active payment provider
-              </p>
-              <p className="mt-1 text-sm text-white/65">
-                Selected via{" "}
-                <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-                  PAYMENT_PROVIDER_DEFAULT
-                </code>{" "}
-                env on Vercel. Mobile clients can override per-request via the{" "}
-                <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-                  provider
-                </code>{" "}
-                field on{" "}
-                <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-                  /api/payments/create-khqr
-                </code>
-                .
-              </p>
-            </div>
-            <CreditCard className="h-6 w-6 flex-shrink-0 text-accent-purple" />
-          </div>
-
-          <ul className="mt-3 space-y-2">
-            {providers.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-mono text-[12px] text-white/85">{p.id}</p>
-                    <ProviderDocLink id={p.id} />
-                  </div>
-                  <p className="mt-0.5 text-xs text-white/55">{p.description}</p>
-                </div>
-                <Badge tone={p.configured ? "green" : "outline"}>
-                  {p.configured ? "Configured" : "Missing env"}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        </GlassCard>
-
         {/* Region cheatsheet ----------------------------------------------*/}
         <GlassCard className="lg:col-span-2">
           <div className="flex items-start justify-between gap-3">
@@ -134,7 +81,7 @@ export default async function PaymentSettingsPage() {
               </p>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-white/75">
                 <li>
-                  <code className="text-xs">x-vercel-ip-country</code> — auto-set
+                  <code className="text-xs">x-vercel-ip-country</code> &mdash; auto-set
                   by Vercel for every deployment{" "}
                   <DocLink
                     href="https://vercel.com/docs/edge-network/headers/request-headers#x-vercel-ip-country"
@@ -143,17 +90,17 @@ export default async function PaymentSettingsPage() {
                   />
                 </li>
                 <li>
-                  <code className="text-xs">cf-ipcountry</code> — Cloudflare proxy fallback
+                  <code className="text-xs">cf-ipcountry</code> &mdash; Cloudflare proxy fallback
                 </li>
                 <li>
-                  <code className="text-xs">x-country</code> — custom override
+                  <code className="text-xs">x-country</code> &mdash; custom override
                 </li>
                 <li>
-                  <code className="text-xs">accept-language</code> — best-effort
+                  <code className="text-xs">accept-language</code> &mdash; best-effort
                   for local dev
                 </li>
                 <li>
-                  <code className="text-xs">DEV_FORCE_COUNTRY</code> env — local
+                  <code className="text-xs">DEV_FORCE_COUNTRY</code> env &mdash; local
                   dev override
                 </li>
               </ol>
@@ -200,28 +147,4 @@ export default async function PaymentSettingsPage() {
       </div>
     </PageShell>
   );
-}
-
-function ProviderDocLink({ id }: { id: string }) {
-  const links: Record<string, { href: string; label: string }> = {
-    manual_aba: {
-      href: "https://www.ababank.com/business/aba-payway/",
-      label: "ABA Bank docs",
-    },
-    bakong_khqr: {
-      href: "https://bakong.nbc.gov.kh/",
-      label: "Bakong dev portal",
-    },
-    aba_payway: {
-      href: "https://developer.payway.com.kh/",
-      label: "PayWay developer suite",
-    },
-    camrapidpay: {
-      href: "https://docs.camrapidpay.com/",
-      label: "CamRapidPay docs",
-    },
-  };
-  const target = links[id];
-  if (!target) return null;
-  return <DocLink href={target.href} label={target.label} inline />;
 }

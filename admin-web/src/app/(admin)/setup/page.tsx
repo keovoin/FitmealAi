@@ -8,12 +8,10 @@ import {
   probeRequiredTables,
   REQUIRED_TABLES_LIST,
 } from "@/lib/supabase/setup-check";
-import { getProviderConfigSnapshot } from "@/lib/payments/factory";
 import {
   AlertTriangle,
   Banknote,
   Check,
-  CreditCard,
   Database,
   X,
 } from "lucide-react";
@@ -94,12 +92,6 @@ export default async function SetupHealthPage() {
               ok={!!process.env.NEXT_PUBLIC_APP_URL}
               detail="Used by the iOS app to find /api/ai endpoints."
               docs={ENV_DOCS.APP_URL}
-            />
-            <EnvRow
-              name="PAYMENT_PROVIDER_DEFAULT"
-              ok={!!process.env.PAYMENT_PROVIDER_DEFAULT}
-              detail="bakong_khqr | aba_payway | camrapidpay (default: bakong_khqr)."
-              docs={ENV_DOCS.PAYMENT_PROVIDER}
             />
           </ul>
         </GlassCard>
@@ -241,63 +233,26 @@ export default async function SetupHealthPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wider text-white/50">
-                Payment providers
+                Payment options
               </p>
               <p className="mt-1 text-base font-semibold text-white">
-                KHQR &amp; subscription gateways
+                ABA + StoreKit + Play Billing
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-accent-blue" />
-              <Link
-                href="/payment-settings"
-                className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
-              >
-                <Banknote className="h-3.5 w-3.5" />
-                Open payment settings
-              </Link>
-            </div>
+            <Link
+              href="/payment-settings"
+              className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+            >
+              <Banknote className="h-3.5 w-3.5" />
+              Open payment settings
+            </Link>
           </div>
           <p className="mt-1 text-sm text-white/65">
-            Active provider is selected by{" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-              PAYMENT_PROVIDER_DEFAULT
-            </code>{" "}
-            env, or per-request via the{" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-              provider
-            </code>{" "}
-            field on{" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-              /api/payments/create-khqr
-            </code>
-            .
+            Manual ABA receipts + Apple StoreKit 2 + Google Play Billing are
+            wired in. Toggle the manual ABA flow on/off and restrict it to
+            specific countries (Cambodia by default) from the Payment
+            settings page.
           </p>
-          <ul className="mt-3 space-y-2">
-            {getProviderConfigSnapshot().map((p) => (
-              <li
-                key={p.id}
-                className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-mono text-[12px] text-white/85">{p.id}</p>
-                    {PROVIDER_DOC_LINKS[p.id] && (
-                      <DocLink
-                        href={PROVIDER_DOC_LINKS[p.id].href}
-                        label={PROVIDER_DOC_LINKS[p.id].label}
-                        inline
-                      />
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs text-white/55">{p.description}</p>
-                </div>
-                <Badge tone={p.configured ? "green" : "outline"}>
-                  {p.configured ? "Configured" : "Missing env"}
-                </Badge>
-              </li>
-            ))}
-          </ul>
         </GlassCard>
       </div>
     </PageShell>
@@ -379,7 +334,7 @@ function IntegrationTile({
 }
 
 // ---------------------------------------------------------------------------
-// Doc link directory — keeps the JSX terse.
+// Doc link directory.
 // ---------------------------------------------------------------------------
 
 const ENV_DOCS = {
@@ -415,27 +370,4 @@ const ENV_DOCS = {
     href: "https://vercel.com/docs/projects/domains",
     label: "Vercel domains",
   },
-  PAYMENT_PROVIDER: {
-    href: "/payment-settings",
-    label: "Payment settings",
-  },
 } as const;
-
-const PROVIDER_DOC_LINKS: Record<string, { href: string; label: string }> = {
-  manual_aba: {
-    href: "https://www.ababank.com/business/aba-payway/",
-    label: "ABA Bank business",
-  },
-  bakong_khqr: {
-    href: "https://bakong.nbc.gov.kh/",
-    label: "Bakong dev portal",
-  },
-  aba_payway: {
-    href: "https://developer.payway.com.kh/",
-    label: "PayWay developer suite",
-  },
-  camrapidpay: {
-    href: "https://docs.camrapidpay.com/",
-    label: "CamRapidPay docs",
-  },
-};
