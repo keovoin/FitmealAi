@@ -6,3 +6,7 @@
 
 ## Mobile/iOS
 - No fixed test user was created in this workspace. Supabase Auth users should be created through the iOS email/password flow or Supabase dashboard.
+
+## Google Sign-In
+- No Google test account or OAuth client IDs were provided.
+- Native Google runtime validation requires adding the GoogleSignIn-iOS package and real Google client IDs in Xcode.
