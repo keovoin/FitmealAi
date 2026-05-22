@@ -1,5 +1,6 @@
 import { GlassCard } from "@/components/ui/glass-card";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
+import { SetupRequiredBanner } from "@/components/ui/setup-required-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { StatTile } from "@/components/ui/stat-tile";
 import { TierBadge } from "@/components/domain/tier-badge";
@@ -11,8 +12,9 @@ import {
   listPayments,
 } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { classifySupabaseError } from "@/lib/supabase/setup-check";
 import { relativeFromNow } from "@/lib/format";
-import { ArrowRight, CreditCard, TrendingUp, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, CreditCard, TrendingUp, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { SignupsChart } from "./signups-chart";
 import { DashboardRegenerateTool } from "./dashboard-regenerate-tool";
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
   }
 
   let snapshot;
-  let recentPayments = [];
+  let recentPayments: Awaited<ReturnType<typeof listPayments>> = [];
 
   try {
     const [snapshotRes, allPayments] = await Promise.all([
@@ -57,23 +59,44 @@ export default async function DashboardPage() {
       .slice(0, 4);
   } catch (error) {
     console.error("Dashboard data fetch error:", error);
-    // Fallback to empty/error state if data fetching fails
+    const hint = classifySupabaseError(error);
+
     return (
       <PageShell title="Dashboard" subtitle="An overview of FitMeal AI today">
-        <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
-          <p className="font-semibold">Unable to load dashboard data</p>
-          <p className="mt-1 text-sm opacity-80">
-            This usually means the Supabase tables are not yet created or the connection is failing. 
-            Please ensure you have run the migrations in your Supabase project.
-          </p>
-          {process.env.NODE_ENV !== "production" && (
-            <p className="mt-2 text-xs font-mono">{(error as Error).message}</p>
-          )}
-        </div>
+        {hint.isMissingTable ? (
+          <SetupRequiredBanner
+            page="The dashboard"
+            rawMessage={hint.rawMessage}
+          />
+        ) : (
+          <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Unable to load dashboard data</p>
+                <p className="mt-1 text-sm opacity-80">
+                  Supabase responded with an error. Check that the service-role
+                  key is set correctly in Vercel and that the database is
+                  reachable.
+                </p>
+                <p className="mt-2 font-mono text-xs opacity-70 break-all">
+                  {hint.rawMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mt-4">
           <GlassCard>
-            <p className="text-xs uppercase tracking-wider text-white/50">Support tool</p>
-            <p className="text-base font-semibold text-white">Regenerate a user&apos;s meal plan</p>
+            <p className="text-xs uppercase tracking-wider text-white/50">
+              Support tool
+            </p>
+            <p className="text-base font-semibold text-white">
+              Regenerate a user&apos;s meal plan
+            </p>
+            <p className="mt-1 text-sm text-white/60">
+              This tool becomes usable once Supabase migrations are applied.
+            </p>
             <DashboardRegenerateTool />
           </GlassCard>
         </div>

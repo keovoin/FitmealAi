@@ -7,17 +7,48 @@ import com.fitmealai.domain.Ingredient
 import com.fitmealai.domain.Meal
 import com.fitmealai.domain.MealPlan
 import com.fitmealai.domain.MealType
-import org.json.JSONArray
-import org.json.JSONObject
+import com.fitmealai.domain.MealPrefs
+import com.fitmealai.domain.WorkoutPrefs
+import com.fitmealai.domain.FitnessGoal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.LocalDate
+import java.time.OffsetDateTime
 
-data class AuthSession(val userId: String, val email: String, val accessToken: String)
-data class PaymentRequest(val id: String, val amountUsd: Double, val status: String)
+// ---------------------------------------------------------------------------
+// Domain DTOs
+// ---------------------------------------------------------------------------
+
+data class AuthSession(
+    val userId: String,
+    val email: String,
+    val accessToken: String,
+    val refreshToken: String? = null,
+    val expiresAtEpochSeconds: Long = 0L,
+) {
+    val isExpired: Boolean
+        get() = expiresAtEpochSeconds > 0 &&
+            (System.currentTimeMillis() / 1000) + 60 >= expiresAtEpochSeconds
+}
+
+data class PaymentRequestResult(
+    val id: String,
+    val amountUsd: Double,
+    val status: String,
+)
+
+class AuthException(message: String) : Exception(message)
+
+// ---------------------------------------------------------------------------
+// AuthRepository — Supabase REST + token refresh
+// ---------------------------------------------------------------------------
 
 class AuthRepository(private val config: AppConfig = AppConfig()) {
+
     suspend fun signIn(email: String, password: String): AuthSession {
         config.requireSupabase()
         val response = postJson(
@@ -28,14 +59,108 @@ class AuthRepository(private val config: AppConfig = AppConfig()) {
         return response.toAuthSession()
     }
 
-    suspend fun signInWithGoogle(idToken: String): AuthSession {
+    suspend fun signUp(email: String, password: String): AuthSession {
         config.requireSupabase()
         val response = postJson(
+            url = "${config.supabaseUrl.trimEnd('/')}/auth/v1/signup",
+            body = JSONObject().put("email", email).put("password", password),
+            headers = supabaseHeaders(),
+        )
+        if (response.optString("access_token").isBlank()) {
+            throw AuthException(
+                "Account created. Please verify your email, then sign in.",
+            )
+        }
+        return response.toAuthSession()
+    }
+
+    suspend fun signInWithGoogle(idToken: String, nonce: String? = null): AuthSession {
+        config.requireSupabase()
+        val body = JSONObject().put("provider", "google").put("id_token", idToken)
+        if (nonce != null) body.put("nonce", nonce)
+        val response = postJson(
             url = "${config.supabaseUrl.trimEnd('/')}/auth/v1/token?grant_type=id_token",
-            body = JSONObject().put("provider", "google").put("id_token", idToken),
+            body = body,
             headers = supabaseHeaders(),
         )
         return response.toAuthSession()
+    }
+
+    /**
+     * Refresh an expired session. Returns the new session, or throws.
+     * Used by AppState on cold start when a saved session is expired.
+     */
+    suspend fun refresh(refreshToken: String): AuthSession {
+        config.requireSupabase()
+        val response = postJson(
+            url = "${config.supabaseUrl.trimEnd('/')}/auth/v1/token?grant_type=refresh_token",
+            body = JSONObject().put("refresh_token", refreshToken),
+            headers = supabaseHeaders(),
+        )
+        return response.toAuthSession()
+    }
+
+    suspend fun signOut(session: AuthSession) {
+        config.requireSupabase()
+        runCatching {
+            postJson(
+                url = "${config.supabaseUrl.trimEnd('/')}/auth/v1/logout",
+                body = JSONObject(),
+                headers = supabaseHeaders() + mapOf("Authorization" to "Bearer ${session.accessToken}"),
+            )
+        }
+    }
+
+    suspend fun saveGoal(session: AuthSession, goal: FitnessGoal, calorieTarget: Int) {
+        upsert(
+            session = session,
+            path = "/rest/v1/user_goals",
+            conflict = "user_id",
+            body = JSONObject()
+                .put("user_id", session.userId)
+                .put("fitness_goal", goal.apiValue)
+                .put("daily_calorie_target", calorieTarget),
+        )
+    }
+
+    suspend fun saveWorkoutPrefs(session: AuthSession, prefs: WorkoutPrefs) {
+        upsert(
+            session = session,
+            path = "/rest/v1/workout_prefs",
+            conflict = "user_id",
+            body = JSONObject()
+                .put("user_id", session.userId)
+                .put("types", JSONArray(prefs.types.sorted()))
+                .put("days", prefs.days)
+                .put("duration", prefs.duration),
+        )
+    }
+
+    suspend fun saveMealPrefs(session: AuthSession, prefs: MealPrefs) {
+        upsert(
+            session = session,
+            path = "/rest/v1/meal_prefs",
+            conflict = "user_id",
+            body = JSONObject()
+                .put("user_id", session.userId)
+                .put("diets", JSONArray(prefs.diets.sorted()))
+                .put("timings", JSONArray(prefs.timings.sorted()))
+                .put("cook_time", prefs.cookTime)
+                .put("allergies", JSONArray(prefs.allergies.sorted())),
+        )
+    }
+
+    private suspend fun upsert(session: AuthSession, path: String, conflict: String, body: JSONObject) {
+        config.requireSupabase()
+        postJson(
+            url = "${config.supabaseUrl.trimEnd('/')}$path?on_conflict=$conflict",
+            body = body,
+            headers = mapOf(
+                "apikey" to config.supabaseAnonKey,
+                "Authorization" to "Bearer ${session.accessToken}",
+                "Prefer" to "resolution=merge-duplicates,return=minimal",
+            ),
+        )
     }
 
     private fun supabaseHeaders(): Map<String, String> = mapOf(
@@ -44,16 +169,26 @@ class AuthRepository(private val config: AppConfig = AppConfig()) {
     )
 
     private fun JSONObject.toAuthSession(): AuthSession {
-        val user = getJSONObject("user")
+        val user = optJSONObject("user")
+            ?: throw AuthException("Auth response missing user payload")
+        val expiresIn = optInt("expires_in", 3600)
+        val expiresAt = (System.currentTimeMillis() / 1000) + expiresIn
         return AuthSession(
             userId = user.getString("id"),
             email = user.optString("email"),
-            accessToken = getString("access_token"),
+            accessToken = optString("access_token"),
+            refreshToken = optString("refresh_token").ifBlank { null },
+            expiresAtEpochSeconds = expiresAt,
         )
     }
 }
 
+// ---------------------------------------------------------------------------
+// AIRepository — POST to /api/ai/meal-plan
+// ---------------------------------------------------------------------------
+
 class AIRepository(private val config: AppConfig = AppConfig()) {
+
     suspend fun generateMealPlan(
         session: AuthSession,
         goal: String,
@@ -62,6 +197,7 @@ class AIRepository(private val config: AppConfig = AppConfig()) {
         allergies: List<String>,
         cookTime: String,
         mealTypes: List<String>,
+        reuseToday: Boolean = false,
     ): MealPlan {
         config.requireApi()
         val response = postJson(
@@ -74,16 +210,27 @@ class AIRepository(private val config: AppConfig = AppConfig()) {
                 .put("allergies", JSONArray(allergies))
                 .put("cook_time", cookTime)
                 .put("meal_types", JSONArray(mealTypes))
-                .put("date", java.time.LocalDate.now().toString())
-                .put("reuse_today_if_present", false),
+                .put("date", LocalDate.now().toString())
+                .put("reuse_today_if_present", reuseToday),
             headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
         )
         return response.toMealPlan()
     }
 }
 
+// ---------------------------------------------------------------------------
+// PaymentRepository — insert into payment_requests
+// ---------------------------------------------------------------------------
+
 class PaymentRepository(private val config: AppConfig = AppConfig()) {
-    suspend fun submitAbaPayment(session: AuthSession, tier: String, amount: String, transactionId: String): PaymentRequest {
+
+    suspend fun submitAbaPayment(
+        session: AuthSession,
+        tier: String,
+        amount: String,
+        transactionId: String,
+        receiptStoragePath: String? = null,
+    ): PaymentRequestResult {
         config.requireSupabase()
         val response = postJson(
             url = "${config.supabaseUrl.trimEnd('/')}/rest/v1/payment_requests",
@@ -93,15 +240,22 @@ class PaymentRepository(private val config: AppConfig = AppConfig()) {
                 .put("amount", amount)
                 .put("transaction_id", transactionId)
                 .put("status", "pending")
-                .put("submitted_at", java.time.OffsetDateTime.now().toString()),
+                .put("submitted_at", OffsetDateTime.now().toString())
+                .let { obj ->
+                    if (receiptStoragePath != null) obj.put("receipt_storage_path", receiptStoragePath)
+                    else obj
+                },
             headers = mapOf(
                 "apikey" to config.supabaseAnonKey,
                 "Authorization" to "Bearer ${session.accessToken}",
+                "Content-Type" to "application/json",
                 "Prefer" to "return=representation",
             ),
         )
-        val first = response.optJSONArray("data")?.optJSONObject(0) ?: response.optJSONArray("rows")?.optJSONObject(0) ?: response
-        return PaymentRequest(
+        val first = response.optJSONArray("data")?.optJSONObject(0)
+            ?: response.optJSONArray("rows")?.optJSONObject(0)
+            ?: response
+        return PaymentRequestResult(
             id = first.optString("id"),
             amountUsd = amount.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0,
             status = first.optString("status", "pending"),
@@ -109,7 +263,15 @@ class PaymentRepository(private val config: AppConfig = AppConfig()) {
     }
 }
 
-private suspend fun postJson(url: String, body: JSONObject, headers: Map<String, String>): JSONObject = withContext(Dispatchers.IO) {
+// ---------------------------------------------------------------------------
+// HTTP helper (uses HttpURLConnection so we don't pull OkHttp into the APK).
+// ---------------------------------------------------------------------------
+
+private suspend fun postJson(
+    url: String,
+    body: JSONObject,
+    headers: Map<String, String>,
+): JSONObject = withContext(Dispatchers.IO) {
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
         requestMethod = "POST"
         connectTimeout = 15_000
@@ -119,26 +281,27 @@ private suspend fun postJson(url: String, body: JSONObject, headers: Map<String,
         headers.forEach { (key, value) -> setRequestProperty(key, value) }
     }
 
-    connection.outputStream.use { output -> output.write(body.toString().toByteArray()) }
+    connection.outputStream.use { it.write(body.toString().toByteArray()) }
     val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
     val text = stream.bufferedReader().use { it.readText() }
     if (connection.responseCode !in 200..299) {
-        throw IllegalStateException(JSONObject(text.ifBlank { "{}" }).optString("error", "Request failed with ${connection.responseCode}"))
+        val err = runCatching { JSONObject(text.ifBlank { "{}" }) }.getOrDefault(JSONObject())
+        val message = err.optString("error_description").ifBlank {
+            err.optString("message").ifBlank { "Request failed with ${connection.responseCode}" }
+        }
+        throw AuthException(message)
     }
-    if (text.trim().startsWith("[")) {
-        JSONObject().put("data", JSONArray(text))
-    } else {
-        JSONObject(text.ifBlank { "{}" })
-    }
+    if (text.trim().startsWith("[")) JSONObject().put("data", JSONArray(text))
+    else JSONObject(text.ifBlank { "{}" })
 }
 
 private fun JSONObject.toMealPlan(): MealPlan {
-    val mealsJson = getJSONArray("meals")
+    val mealsJson = optJSONArray("meals") ?: JSONArray()
     val meals = (0 until mealsJson.length()).map { index ->
         val item = mealsJson.getJSONObject(index)
         Meal(
             id = item.optString("meal_id", "meal-$index"),
-            type = mealType(item.optString("meal_type", "snack")),
+            type = mealTypeFor(item.optString("meal_type", "snack")),
             title = item.optString("title", "Generated meal"),
             description = item.optString("description").ifBlank { null },
             calories = item.optInt("calories", 0),
@@ -146,28 +309,28 @@ private fun JSONObject.toMealPlan(): MealPlan {
             carbsGrams = item.optInt("carbs_g", 0),
             fatGrams = item.optInt("fat_g", 0),
             imageUrl = item.optString("image_url").ifBlank { null },
-            ingredients = item.optJSONArray("ingredients")?.let { ingredients ->
-                (0 until ingredients.length()).map { ingredientIndex ->
-                    val ingredient = ingredients.getJSONObject(ingredientIndex)
+            ingredients = item.optJSONArray("ingredients")?.let { arr ->
+                (0 until arr.length()).map { i ->
+                    val ing = arr.getJSONObject(i)
                     Ingredient(
-                        name = ingredient.optString("name"),
-                        grams = ingredient.optInt("grams"),
-                        calories = ingredient.optInt("calories"),
-                        proteinGrams = ingredient.optInt("protein_g"),
-                        carbsGrams = ingredient.optInt("carbs_g"),
-                        fatGrams = ingredient.optInt("fat_g"),
+                        name = ing.optString("name"),
+                        grams = ing.optInt("grams"),
+                        calories = ing.optInt("calories"),
+                        proteinGrams = ing.optInt("protein_g"),
+                        carbsGrams = ing.optInt("carbs_g"),
+                        fatGrams = ing.optInt("fat_g"),
                     )
                 }
             } ?: emptyList(),
             recipeSteps = item.optJSONArray("recipe_steps")?.let { steps ->
-                (0 until steps.length()).map { stepIndex -> steps.optString(stepIndex) }
+                (0 until steps.length()).map { i -> steps.optString(i) }
             } ?: emptyList(),
         )
     }
-    return MealPlan(dateLabel = java.time.LocalDate.now().toString(), meals = meals)
+    return MealPlan(dateLabel = LocalDate.now().toString(), meals = meals)
 }
 
-private fun mealType(value: String): MealType = when (value) {
+private fun mealTypeFor(value: String): MealType = when (value) {
     "breakfast" -> MealType.Breakfast
     "lunch" -> MealType.Lunch
     "dinner" -> MealType.Dinner

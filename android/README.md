@@ -1,62 +1,112 @@
 # FitMeal AI Android
 
-Android A1 foundation for the future FitMeal AI Android app.
+Phase A4 Android client mirroring the iOS feature set.
 
 ## What is included
 
-- Kotlin + Jetpack Compose project shell.
-- Gradle wrapper tooling for repeatable local/CI builds.
-- Dark glass theme ported from the iOS `AppTheme` tokens.
-- Domain models for profile, meals, ingredients, meal plans, tiers, and goals.
-- Mock data matching the iOS preview concept.
-- Starter root flow: splash → login → onboarding → main shell.
-- Main shell with Home/Meals/Workout/Habits/Progress tabs.
+- **A1** Project shell (Kotlin + Compose + Material 3 + Gradle wrapper).
+- **A2** Full SwiftUI -> Compose port of every screen:
+  - Splash, Login (email + Google), 3-step onboarding (Goal / Workout / Meal).
+  - Bottom-nav main shell with Home, Meals, Workout, Habits, Progress, Settings tabs.
+  - Modal sheets: Paywall, ABA Payment, Payment Pending, Workout Settings, Meal Settings.
+  - Premium emerald glassmorphism theme matching iOS Phase 4e.
+- **A3** Production integrations:
+  - **Encrypted session storage** via `EncryptedSharedPreferences` (`SessionStore.kt`).
+  - **Google Sign-In via Credential Manager** (`GoogleSignInHelper.kt`) with nonce + ID-token forwarding to Supabase's `grant_type=id_token` endpoint.
+  - Token refresh on cold start (`AppState.bootstrap()`).
+  - StateFlow-driven app state with `RootFlow`, `MainTab`, `AppSheet` enums.
+  - `PreferencesStore` (plain prefs) for meal/workout choices.
+- **A4** Payments:
+  - **Google Play Billing** scaffold (`BillingHelper.kt`) for `fitmeal_silver_monthly` and `fitmeal_gold_monthly` SKUs.
+  - **ABA manual payment** flow with QR placeholder, merchant info, transaction-ID input, screenshot stub, and direct write to Supabase `payment_requests`.
 
-## Integration status
+## Architecture
 
-- Supabase email/password REST calls are wired in `AuthRepository` and activate when Gradle config values are provided.
-- AI meal generation REST calls are wired in `AIRepository` and call the existing `/api/ai/meal-plan` endpoint.
-- ABA payment request insertion is wired in `PaymentRepository` for the `payment_requests` table.
-- Google Credential Manager and Play Billing UI/runtime are still next because Google/Play credentials are not present in this repo.
+```
+app/src/main/java/com/fitmealai
+├── MainActivity.kt
+├── config/
+│   └── AppConfig.kt              BuildConfig-backed env values
+├── domain/
+│   └── Models.kt                 enums + data classes (mirrors iOS Core/Models)
+├── data/
+│   ├── Services.kt               AuthRepository / AIRepository / PaymentRepository
+│   ├── SessionStore.kt           AES-256 GCM session persistence
+│   ├── PreferencesStore.kt       meal/workout pref persistence
+│   ├── GoogleSignInHelper.kt     Credential Manager bridge
+│   ├── BillingHelper.kt          Play Billing scaffold
+│   └── MockData.kt               default plan/meals/habits
+└── ui/
+    ├── AppState.kt               top-level StateFlow holder + auth/onboarding logic
+    ├── FitMealAndroidApp.kt      router (Splash/Login/Onboarding/Main)
+    ├── MainShell.kt              bottom-nav + sheet host
+    ├── theme/
+    │   └── FitMealTheme.kt       FitMealColors + FitMealBrushes + spacing/radius
+    ├── components/
+    │   └── FitMealComponents.kt  GlassCard, PrimaryGradientButton, SegmentedPicker,
+    │                             MultiSelectGrid, OnboardingStepIndicator, TopBar,
+    │                             SecondaryGlassButton, ScreenContainer, TagPill
+    └── screens/
+        ├── SplashScreen.kt
+        ├── LoginScreen.kt
+        ├── onboarding/
+        │   ├── OnboardingGoalScreen.kt
+        │   ├── OnboardingWorkoutScreen.kt
+        │   └── OnboardingMealScreen.kt
+        ├── home/HomeScreen.kt
+        ├── meals/MealPlanScreen.kt
+        ├── workout/WorkoutScreen.kt
+        ├── habits/HabitsScreen.kt
+        ├── progress/ProgressScreen.kt
+        ├── settings/
+        │   ├── SettingsScreen.kt
+        │   └── SettingsSubScreens.kt
+        ├── paywall/PaywallScreen.kt
+        └── payment/
+            ├── AbaPaymentScreen.kt
+            └── PaymentPendingScreen.kt
+```
 
 ## Config
 
-Real config values were not provided in chat, so only placeholders are included.
-Use `config.example.properties` as the reference and store real values in local Gradle properties or CI secrets later:
+Real config values are not committed. Use `config.example.properties` and put real values into your local Gradle properties (`~/.gradle/gradle.properties`) or CI secrets.
 
-```properties
-FITMEAL_SUPABASE_URL=...
-FITMEAL_SUPABASE_ANON_KEY=...
-FITMEAL_API_BASE_URL=...
-FITMEAL_GOOGLE_ANDROID_CLIENT_ID=...
-FITMEAL_GOOGLE_WEB_CLIENT_ID=...
-```
+| Property | Used by | iOS equivalent |
+|---|---|---|
+| `FITMEAL_SUPABASE_URL` | All Supabase calls | `FITMEAL_SUPABASE_URL` |
+| `FITMEAL_SUPABASE_ANON_KEY` | All Supabase calls | `FITMEAL_SUPABASE_ANON_KEY` |
+| `FITMEAL_API_BASE_URL` | `/api/ai/meal-plan` | `FITMEAL_API_BASE_URL` |
+| `FITMEAL_GOOGLE_ANDROID_CLIENT_ID` | Credential Manager (optional) | n/a |
+| `FITMEAL_GOOGLE_WEB_CLIENT_ID` | Required for Credential Manager | `FITMEAL_GOOGLE_SERVER_CLIENT_ID` |
+
+The Google **Web (server) client ID** must match what Supabase Auth is configured to accept for `grant_type=id_token`.
+
+## Required Play Console setup (before A4 SKUs activate)
+
+1. Upload an internal-track build of the app.
+2. In **Play Console -> Monetize -> Subscriptions**, create:
+   - `fitmeal_silver_monthly` -> $4.99 / month base plan
+   - `fitmeal_gold_monthly` -> $9.99 / month base plan
+3. The `BillingHelper` queries those product IDs at launch.
 
 ## Build verification
 
-This repo now includes a Gradle wrapper pinned to a modern Gradle version compatible with the Android Gradle Plugin used by the app.
-
-Requirements on your machine/CI:
-
-- JDK 17
-- Android SDK with API 35
-- `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
-
-Run:
+Requires JDK 17, Android SDK with API 35, and `ANDROID_HOME` set.
 
 ```bash
 cd android
 ./scripts/verify-android-build.sh
 ```
 
-In this workspace, Android build execution is blocked because Java/Android SDK are not installed, but the wrapper files and verification script are present.
+The wrapper auto-downloads Gradle. The repo does not bundle the
+Android SDK, so the build will fail on machines without it.
 
-## Recommended next Android phase
+## Status
 
-Continue with **A2 Core Screens** and integration wiring after iOS Phase 5 QA:
-
-1. Port full onboarding goal/workout/meal screens.
-2. Port complete dashboard, meal plan, workout, habit, progress, and settings screens.
-3. Add ViewModels and StateFlow state holders.
-4. Connect the existing repositories to ViewModels.
-5. Add Google Credential Manager and Play Billing once IDs/products are ready.
+| Phase | What it ships | Done |
+|---|---|---|
+| A1 | Project shell + theme + repos | ✅ |
+| A2 | Full screen port + ViewModels | ✅ |
+| A3 | EncryptedSession + Credential Manager | ✅ |
+| A4 | Play Billing scaffold + ABA payment flow | ✅ |
+| A5 | Pixel 8/9 emulator QA | requires Mac/Linux with SDK |

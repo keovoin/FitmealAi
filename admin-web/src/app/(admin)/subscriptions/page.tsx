@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
+import { SetupRequiredBanner } from "@/components/ui/setup-required-banner";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
@@ -8,12 +9,31 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { TierBadge } from "@/components/domain/tier-badge";
 import { listSubscriptions } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { classifySupabaseError } from "@/lib/supabase/setup-check";
 import { formatDate } from "@/lib/format";
 import type { AdminSubscription } from "@/data/types";
-import { CreditCard, Inbox, RefreshCcw, TrendingUp } from "lucide-react";
+import { AlertTriangle, CreditCard, Inbox, RefreshCcw, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+async function safeListSubscriptions(): Promise<
+  | { ok: true; value: AdminSubscription[] }
+  | { ok: false; missingTables: boolean; message: string }
+> {
+  try {
+    const value = await listSubscriptions();
+    return { ok: true, value };
+  } catch (error) {
+    console.error("subscriptions page error:", error);
+    const hint = classifySupabaseError(error);
+    return {
+      ok: false,
+      missingTables: hint.isMissingTable,
+      message: hint.rawMessage,
+    };
+  }
+}
 
 export default async function SubscriptionsPage() {
   if (!isSupabaseConfigured()) {
@@ -24,7 +44,29 @@ export default async function SubscriptionsPage() {
     );
   }
 
-  const all = await listSubscriptions();
+  const allRes = await safeListSubscriptions();
+  if (!allRes.ok) {
+    return (
+      <PageShell title="Subscriptions" subtitle="StoreKit + manual ABA subscriptions across all tiers.">
+        {allRes.missingTables ? (
+          <SetupRequiredBanner page="The subscriptions list" rawMessage={allRes.message} />
+        ) : (
+          <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Unable to load subscriptions</p>
+                <p className="mt-1 text-sm opacity-80 break-all font-mono">
+                  {allRes.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+  const all = allRes.value;
   const active = all.filter((s) => s.status === "active");
   const pastDue = all.filter((s) => s.status === "past_due");
   const canceled = all.filter((s) => s.status === "canceled");

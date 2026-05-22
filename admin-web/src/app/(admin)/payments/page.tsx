@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
+import { SetupRequiredBanner } from "@/components/ui/setup-required-banner";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
@@ -8,12 +9,31 @@ import { PaymentStatusBadge } from "@/components/domain/payment-status-badge";
 import { TierBadge } from "@/components/domain/tier-badge";
 import { listPayments } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { classifySupabaseError } from "@/lib/supabase/setup-check";
 import { relativeFromNow } from "@/lib/format";
 import type { AdminPayment, PaymentStatus } from "@/data/types";
-import { Inbox } from "lucide-react";
+import { AlertTriangle, Inbox } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+async function safeListPayments(): Promise<
+  | { ok: true; value: AdminPayment[] }
+  | { ok: false; missingTables: boolean; message: string }
+> {
+  try {
+    const value = await listPayments();
+    return { ok: true, value };
+  } catch (error) {
+    console.error("payments page error:", error);
+    const hint = classifySupabaseError(error);
+    return {
+      ok: false,
+      missingTables: hint.isMissingTable,
+      message: hint.rawMessage,
+    };
+  }
+}
 
 const STATUS_TABS: Array<{ key: PaymentStatus | "all"; label: string }> = [
   { key: "pending", label: "Pending" },
@@ -39,8 +59,29 @@ export default async function PaymentsPage({
     );
   }
 
-  const allPayments = await listPayments();
-  const rows = allPayments.filter((p) => {
+  const allPayments = await safeListPayments();
+  if (!allPayments.ok) {
+    return (
+      <PageShell title="Payments" subtitle="Review manual ABA receipts and approve subscriptions.">
+        {allPayments.missingTables ? (
+          <SetupRequiredBanner page="The payments queue" rawMessage={allPayments.message} />
+        ) : (
+          <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Unable to load payments</p>
+                <p className="mt-1 text-sm opacity-80 break-all font-mono">
+                  {allPayments.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+  const rows = allPayments.value.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     if (!query) return true;
     return (
@@ -50,10 +91,10 @@ export default async function PaymentsPage({
   });
 
   const counts = {
-    pending: allPayments.filter((p) => p.status === "pending").length,
-    approved: allPayments.filter((p) => p.status === "approved").length,
-    rejected: allPayments.filter((p) => p.status === "rejected").length,
-    all: allPayments.length,
+    pending: allPayments.value.filter((p) => p.status === "pending").length,
+    approved: allPayments.value.filter((p) => p.status === "approved").length,
+    rejected: allPayments.value.filter((p) => p.status === "rejected").length,
+    all: allPayments.value.length,
   } as const;
 
   return (
