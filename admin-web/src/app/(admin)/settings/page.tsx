@@ -4,6 +4,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { isAIConfigured } from "@/lib/ai/openai";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { MobileConfigPanel } from "./mobile-config-panel";
+import { Stethoscope } from "lucide-react";
+import Link from "next/link";
 
 export default function AdminSettingsPage() {
   const supabaseOn = isSupabaseConfigured();
@@ -14,6 +16,15 @@ export default function AdminSettingsPage() {
     <PageShell
       title="Admin settings"
       subtitle="Tools and integrations the admin uses."
+      actions={
+        <Link
+          href="/setup"
+          className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+        >
+          <Stethoscope className="h-3.5 w-3.5" />
+          Setup health check
+        </Link>
+      }
     >
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <GlassCard>

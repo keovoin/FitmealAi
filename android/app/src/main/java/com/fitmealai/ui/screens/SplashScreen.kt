@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,15 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitmealai.ui.theme.FitMealBrushes
 import com.fitmealai.ui.theme.FitMealColors
-import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen(onFinished: () -> Unit) {
-    LaunchedEffect(Unit) {
-        delay(900)
-        onFinished()
-    }
-
+fun SplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -35,14 +28,22 @@ fun SplashScreen(onFinished: () -> Unit) {
             .testTag("android-splash-screen"),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Box(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
                     .background(FitMealBrushes.PrimaryButton),
             )
-            Text("FitMeal AI", color = FitMealColors.TextPrimary, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "FitMeal AI",
+                color = FitMealColors.TextPrimary,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+            )
             Text("Plans that move with you", color = FitMealColors.TextSecondary)
         }
     }

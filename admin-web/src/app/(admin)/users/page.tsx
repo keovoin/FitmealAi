@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/ui/avatar";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
+import { SetupRequiredBanner } from "@/components/ui/setup-required-banner";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
@@ -7,12 +8,31 @@ import { TierBadge } from "@/components/domain/tier-badge";
 import { UserStatusBadge } from "@/components/domain/user-status-badge";
 import { listUsers } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { classifySupabaseError } from "@/lib/supabase/setup-check";
 import { relativeFromNow } from "@/lib/format";
 import type { AdminUser, SubscriptionTier, UserStatus } from "@/data/types";
-import { Inbox } from "lucide-react";
+import { AlertTriangle, Inbox } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+async function safeListUsers(): Promise<
+  | { ok: true; value: AdminUser[] }
+  | { ok: false; missingTables: boolean; message: string }
+> {
+  try {
+    const value = await listUsers();
+    return { ok: true, value };
+  } catch (error) {
+    console.error("users page error:", error);
+    const hint = classifySupabaseError(error);
+    return {
+      ok: false,
+      missingTables: hint.isMissingTable,
+      message: hint.rawMessage,
+    };
+  }
+}
 
 const TIER_TABS: Array<{ key: SubscriptionTier | "all"; label: string }> = [
   { key: "all", label: "All" },
@@ -39,8 +59,29 @@ export default async function UsersPage({
     );
   }
 
-  const allUsers = await listUsers();
-  const rows = allUsers.filter((u) => {
+  const allUsers = await safeListUsers();
+  if (!allUsers.ok) {
+    return (
+      <PageShell title="Users" subtitle="Search, filter, and inspect customer accounts.">
+        {allUsers.missingTables ? (
+          <SetupRequiredBanner page="The users list" rawMessage={allUsers.message} />
+        ) : (
+          <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Unable to load users</p>
+                <p className="mt-1 text-sm opacity-80 break-all font-mono">
+                  {allUsers.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+  const rows = allUsers.value.filter((u) => {
     if (tierFilter !== "all" && u.tier !== tierFilter) return false;
     if (statusFilter !== "all" && u.status !== statusFilter) return false;
     if (!query) return true;

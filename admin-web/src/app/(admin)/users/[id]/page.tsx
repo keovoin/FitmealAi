@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
+import { SetupRequiredBanner } from "@/components/ui/setup-required-banner";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { PaymentStatusBadge } from "@/components/domain/payment-status-badge";
@@ -12,13 +13,45 @@ import {
   listSubscriptionsByUserId,
 } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { classifySupabaseError } from "@/lib/supabase/setup-check";
 import { formatDateTime, relativeFromNow } from "@/lib/format";
-import { ChevronLeft, Mail, Phone } from "lucide-react";
+import type { AdminPayment, AdminSubscription, AdminUser } from "@/data/types";
+import { AlertTriangle, ChevronLeft, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { UserActions } from "./user-actions";
 
 export const dynamic = "force-dynamic";
+
+interface UserBundle {
+  user: AdminUser | null;
+  payments: AdminPayment[];
+  subs: AdminSubscription[];
+}
+
+async function safeLoadBundle(
+  id: string,
+): Promise<
+  | { ok: true; value: UserBundle }
+  | { ok: false; missingTables: boolean; message: string }
+> {
+  try {
+    const [user, payments, subs] = await Promise.all([
+      getUserById(id),
+      listPaymentsByUserId(id),
+      listSubscriptionsByUserId(id),
+    ]);
+    return { ok: true, value: { user, payments, subs } };
+  } catch (error) {
+    console.error("user detail page error:", error);
+    const hint = classifySupabaseError(error);
+    return {
+      ok: false,
+      missingTables: hint.isMissingTable,
+      message: hint.rawMessage,
+    };
+  }
+}
 
 export default async function UserDetailPage({
   params,
@@ -35,11 +68,29 @@ export default async function UserDetailPage({
     );
   }
 
-  const [user, payments, subs] = await Promise.all([
-    getUserById(id),
-    listPaymentsByUserId(id),
-    listSubscriptionsByUserId(id),
-  ]);
+  const bundleRes = await safeLoadBundle(id);
+  if (!bundleRes.ok) {
+    return (
+      <PageShell title="User">
+        {bundleRes.missingTables ? (
+          <SetupRequiredBanner page="User details" rawMessage={bundleRes.message} />
+        ) : (
+          <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Unable to load user</p>
+                <p className="mt-1 text-sm opacity-80 break-all font-mono">
+                  {bundleRes.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+  const { user, payments, subs } = bundleRes.value;
   if (!user) notFound();
 
   return (
