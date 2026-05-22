@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply text-white antialiased;
+    background-image: linear-gradient(
+      135deg,
+      #0f172a 0%,
+      #1e3a8a 50%,
+      #7c3aed 100%
+    );
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-card border border-glass-stroke bg-white/[0.06] shadow-glass backdrop-blur-2xl;
+  }
+
+  .glass-pill {
+    @apply rounded-full border border-glass-stroke bg-white/[0.08] backdrop-blur-md;
+  }
+
+  .glass-input {
+    @apply w-full rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-accent-purple/60 focus:outline-none focus:ring-2 focus:ring-accent-purple/30;
+  }
+
+  .stat-tile {
+    @apply glass-card flex items-center gap-3 px-4 py-4;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

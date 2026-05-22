@@ -1,11 +1,36 @@
+# FitMeal AI
 
-  # Refine VitaGlass AI Design
+iOS-first wellness app combining AI meal planning, AI workout planning, habit tracking, and progress dashboards. Free / Silver / Gold tiers, with both StoreKit and manual ABA payment paths.
 
-  This is a code bundle for Refine VitaGlass AI Design. The original project is available at https://www.figma.com/design/yb7nPZaCvbCqKiPDf99av7/Refine-VitaGlass-AI-Design.
+## Repo layout
 
-  ## Running the code
+This is a **monorepo** with three loosely-coupled folders:
 
-  Run `npm i` to install the dependencies.
+| Folder | What it is | How to run |
+|---|---|---|
+| [`FitMealAI/`](./FitMealAI/) | iOS SwiftUI app (the production product) | Xcode 15+, iOS 17+. See [FitMealAI/README.md](./FitMealAI/README.md). |
+| [`admin-web/`](./admin-web/) | Next.js 15 admin CMS (internal-only web UI) | `cd admin-web && npm install && npm run dev`. See [admin-web/README.md](./admin-web/README.md). |
+| `src/` (legacy) | React/Vite Figma Make export. Visual reference only. | `npm install && npm run dev`. Frozen — not the production app. |
 
-  Run `npm run dev` to start the development server.
-  
+## Folder ownership
+
+To keep the iOS work safe from accidental overwrites, these paths are owned by specific workstreams:
+
+- `FitMealAI/` and `.kiro/` — iOS workstream (Swift, MVVM, iOS 17+)
+- `admin-web/` — admin CMS workstream (Next.js, Tailwind, TypeScript)
+- `src/` — paused Figma Make export, design reference only
+
+## Where to look first
+
+- Want to see the iOS code? Start at [`FitMealAI/App/RootView.swift`](./FitMealAI/App/RootView.swift) — Phase 2 ships a dev screen index that links to every screen.
+- Want to run the admin? `cd admin-web && npm install && npm run dev`. Default login is `fitmeal-admin`.
+- Want to read the spec? See [`.kiro/specs/figma-to-swiftui/requirements.md`](./.kiro/specs/figma-to-swiftui/requirements.md) and [`tasks.md`](./.kiro/specs/figma-to-swiftui/tasks.md).
+
+## Roadmap
+
+- **Phase 1** — Foundation (design system, models, mocks). Done.
+- **Phase 2** — All 17 iOS screens with MVVM and previews. Done.
+- **Phase 3a** — Admin CMS scaffold (this PR). Done.
+- **Phase 3b** — iOS navigation (real RootView router, MainTabView). Next.
+- **Phase 4** — Backend + real auth + persistence. Future.
+- **Phase 5** — Android port (Jetpack Compose, reusing the same domain shapes).
