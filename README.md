@@ -24,6 +24,7 @@ To keep the iOS work safe from accidental overwrites, these paths are owned by s
 
 - Want to see the iOS code? Start at [`FitMealAI/App/RootView.swift`](./FitMealAI/App/RootView.swift) — Phase 2 ships a dev screen index that links to every screen.
 - Want to run the admin? `cd admin-web && npm install && npm run dev`. Default login is `fitmeal-admin`.
+- **Want to deploy the admin to Vercel without installing anything locally?** See [`admin-web/DEPLOY.md`](./admin-web/DEPLOY.md). The key step is setting the **Root Directory** to `admin-web` during import — without that, Vercel will try to build the legacy Vite project at the repo root.
 - Want to read the spec? See [`.kiro/specs/figma-to-swiftui/requirements.md`](./.kiro/specs/figma-to-swiftui/requirements.md) and [`tasks.md`](./.kiro/specs/figma-to-swiftui/tasks.md).
 
 ## Roadmap
