@@ -13,7 +13,7 @@ cp .env.example .env.local        # set ADMIN_PASSWORD if you want a custom one
 npm run dev
 ```
 
-Open http://localhost:3000. Default password is `fitmeal-admin`.
+Open http://localhost:3000. In dev mode, the password defaults to `dev-only-password-please-change` if `ADMIN_PASSWORD` isn't set (a console warning prints to remind you).
 
 ## What it does today
 

@@ -51,12 +51,15 @@
 - [x] Steering file at `.kiro/steering/supabase.md`
 
 ## Phase 4b: AI meal generation + image cache
-- [ ] `/api/ai/meal-plan` Vercel Function calling check_ai_rate_limit before each request
-- [ ] OpenAI structured-output prompt for meal title, recipe, ingredients, macros
-- [ ] Slug-based cache check in `meals` table; reuse if exists
-- [ ] On miss, generate image with OpenAI Images API, upload to `meal-images` bucket, save URL
-- [ ] Log every call to `ai_generations` (real or cached)
-- [ ] Admin "regenerate user's plan" tool
+- [x] `/api/ai/meal-plan` Vercel Function calling check_ai_rate_limit before each request
+- [x] OpenAI structured-output prompt for meal title, recipe, ingredients, macros
+- [x] Slug-based cache check in `meals` table; reuse if exists
+- [x] On miss, generate image with OpenAI Images API, upload to `meal-images` bucket, save URL
+- [x] Log every call to `ai_generations` (real or cached)
+- [x] Global daily USD ceiling (`OPENAI_DAILY_BUDGET_USD`) as second line of defense
+- [x] Zod-validated input + output schemas (`lib/ai/types.ts`)
+- [x] Settings page surfaces "OpenAI Connected" / "Not configured"
+- [ ] Admin "regenerate user's plan" tool (deferred to Phase 4c when we have user records)
 
 ## Phase 4c: iOS auth + AI integration
 - [ ] AuthService.swift with Supabase Auth (email + Apple + Google)

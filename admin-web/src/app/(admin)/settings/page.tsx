@@ -1,10 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
+import { isAIConfigured } from "@/lib/ai/openai";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export default function AdminSettingsPage() {
   const supabaseOn = isSupabaseConfigured();
+  const aiOn = isAIConfigured();
   return (
     <PageShell
       title="Admin settings"
@@ -47,6 +49,26 @@ export default function AdminSettingsPage() {
 
         <GlassCard>
           <p className="text-xs uppercase tracking-wider text-white/50">
+            AI meal generation
+          </p>
+          <p className="mt-1 text-base font-semibold text-white">
+            {aiOn ? "OpenAI connected" : "OpenAI not connected"}
+          </p>
+          <p className="mt-2 text-sm text-white/65">
+            {aiOn
+              ? "POST /api/ai/meal-plan generates structured meals, dedupes by title slug, and caches images in the meal-images bucket."
+              : "Set OPENAI_API_KEY in Vercel env vars to enable meal generation."}
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <Badge tone={aiOn ? "green" : "outline"}>
+              {aiOn ? "Connected" : "Not configured"}
+            </Badge>
+            <Badge tone="blue">Rate-limited per tier</Badge>
+          </div>
+        </GlassCard>
+
+        <GlassCard>
+          <p className="text-xs uppercase tracking-wider text-white/50">
             Notifications
           </p>
           <p className="mt-1 text-base font-semibold text-white">
@@ -58,22 +80,6 @@ export default function AdminSettingsPage() {
           </p>
           <div className="mt-3">
             <Badge tone="outline">Planned</Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <p className="text-xs uppercase tracking-wider text-white/50">
-            Content library
-          </p>
-          <p className="mt-1 text-base font-semibold text-white">
-            Meals, exercises, habits
-          </p>
-          <p className="mt-2 text-sm text-white/65">
-            Curated templates the AI can pull from. Phase-4b adds the AI
-            meal-plan endpoint that fills the shared meals pool.
-          </p>
-          <div className="mt-3">
-            <Badge tone="outline">Phase 4b</Badge>
           </div>
         </GlassCard>
       </div>
