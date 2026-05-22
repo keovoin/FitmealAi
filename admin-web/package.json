@@ -13,6 +13,7 @@
     "next": "15.5.18",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "@supabase/supabase-js": "2.45.4",
     "lucide-react": "0.460.0",
     "recharts": "2.15.0",
     "clsx": "2.1.1",

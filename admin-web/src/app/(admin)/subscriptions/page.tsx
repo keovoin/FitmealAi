@@ -1,20 +1,33 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { StatTile } from "@/components/ui/stat-tile";
 import { TierBadge } from "@/components/domain/tier-badge";
-import { MOCK_SUBSCRIPTIONS } from "@/data/mock-subscriptions";
+import { listSubscriptions } from "@/lib/supabase/admin-queries";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/format";
 import type { AdminSubscription } from "@/data/types";
 import { CreditCard, Inbox, RefreshCcw, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
-export default function SubscriptionsPage() {
-  const active = MOCK_SUBSCRIPTIONS.filter((s) => s.status === "active");
-  const pastDue = MOCK_SUBSCRIPTIONS.filter((s) => s.status === "past_due");
-  const canceled = MOCK_SUBSCRIPTIONS.filter((s) => s.status === "canceled");
+export const dynamic = "force-dynamic";
+
+export default async function SubscriptionsPage() {
+  if (!isSupabaseConfigured()) {
+    return (
+      <PageShell title="Subscriptions">
+        <ConfigureSupabaseBanner />
+      </PageShell>
+    );
+  }
+
+  const all = await listSubscriptions();
+  const active = all.filter((s) => s.status === "active");
+  const pastDue = all.filter((s) => s.status === "past_due");
+  const canceled = all.filter((s) => s.status === "canceled");
 
   const mrrCents = active.reduce(
     (acc, s) => acc + Number(s.monthlyPrice.replace(/[^0-9.]/g, "")) * 100,
@@ -128,7 +141,7 @@ export default function SubscriptionsPage() {
               width: "w-32",
             },
           ]}
-          rows={MOCK_SUBSCRIPTIONS}
+          rows={all}
           emptyState={
             <GlassCard className="p-10 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.08]">

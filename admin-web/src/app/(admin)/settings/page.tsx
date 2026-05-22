@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export default function AdminSettingsPage() {
+  const supabaseOn = isSupabaseConfigured();
   return (
     <PageShell
       title="Admin settings"
@@ -16,8 +18,8 @@ export default function AdminSettingsPage() {
           </p>
           <p className="mt-2 text-sm text-white/65">
             Change <code className="rounded bg-white/10 px-1 py-0.5 text-xs">ADMIN_PASSWORD</code>
-            {" "}in your environment to rotate. We&apos;ll move this to SSO with the
-            backend.
+            {" "}in your environment to rotate. We&apos;ll move this to SSO once
+            real admin accounts are needed.
           </p>
           <div className="mt-3">
             <Badge tone="purple">Phase-3 stub</Badge>
@@ -29,16 +31,18 @@ export default function AdminSettingsPage() {
             Data source
           </p>
           <p className="mt-1 text-base font-semibold text-white">
-            Mock data files
+            {supabaseOn ? "Supabase Postgres" : "Mock fixtures"}
           </p>
           <p className="mt-2 text-sm text-white/65">
-            All users, payments, and subscriptions come from{" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
-              src/data/mock-*.ts
-            </code>
-            . The data shape mirrors the iOS app so the future backend can
-            serve both.
+            {supabaseOn
+              ? "All users, payments, and subscriptions read from Supabase via the service role. Approve/reject decisions persist immediately and the user's tier auto-updates."
+              : "Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel env vars to switch to the live database."}
           </p>
+          <div className="mt-3">
+            <Badge tone={supabaseOn ? "green" : "outline"}>
+              {supabaseOn ? "Connected" : "Not configured"}
+            </Badge>
+          </div>
         </GlassCard>
 
         <GlassCard>
@@ -49,8 +53,8 @@ export default function AdminSettingsPage() {
             Push & in-app messages
           </p>
           <p className="mt-2 text-sm text-white/65">
-            Coming after the backend lands. For now, payment approvals don&apos;t
-            actually notify the user.
+            Coming with the iOS auth wiring. Approval triggers do not yet
+            push a notification to the user&apos;s device.
           </p>
           <div className="mt-3">
             <Badge tone="outline">Planned</Badge>
@@ -65,11 +69,11 @@ export default function AdminSettingsPage() {
             Meals, exercises, habits
           </p>
           <p className="mt-2 text-sm text-white/65">
-            Curated templates the AI can pull from. Phase-5 work, scoped after
-            the backend is in place.
+            Curated templates the AI can pull from. Phase-4b adds the AI
+            meal-plan endpoint that fills the shared meals pool.
           </p>
           <div className="mt-3">
-            <Badge tone="outline">Planned</Badge>
+            <Badge tone="outline">Phase 4b</Badge>
           </div>
         </GlassCard>
       </div>
