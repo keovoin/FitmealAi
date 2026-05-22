@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_COOKIE } from "@/lib/auth";
+// IMPORTANT: middleware runs on the Edge runtime; never import from
+// "@/lib/auth" here because that module pulls in Node's `crypto`. Use
+// the small constants file instead.
+import { ADMIN_COOKIE } from "@/lib/auth-constants";
 
 const PUBLIC_PATHS = ["/login", "/api/login", "/api/logout"];
 

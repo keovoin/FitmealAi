@@ -1,28 +1,35 @@
 import { cookies } from "next/headers";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { ADMIN_COOKIE } from "./auth-constants";
 
 /**
  * Phase-3 stub auth. Single shared password gates the admin until
  * Phase-4c moves us to Supabase-backed admin accounts.
  *
- * Security hardening (vs. earlier draft):
+ * Security hardening:
  *   - No insecure default fallback in production. If ADMIN_PASSWORD
- *     isn't set, the login route refuses to authenticate ANYONE.
+ *     isn't set, we refuse to authenticate ANYONE.
  *   - Cookie value is the SHA-256 of (process boot secret + admin
- *     password hash), so cookies issued by a previous deploy with a
+ *     password), so cookies issued by a previous deploy with a
  *     different password won't validate against a new one.
  *   - Constant-time comparison so we don't leak password length via
- *     timing. (Not critical here, but cheap to do right.)
+ *     timing.
  *   - Minimum password length of 8 chars enforced at boot.
+ *
+ * Edge-runtime safety:
+ *   - This file uses Node's `crypto`. It must NEVER be imported by
+ *     `middleware.ts` (which runs on the Edge). Edge code imports
+ *     `auth-constants.ts` instead.
+ *   - PROCESS_SECRET is computed lazily on first use (not at module
+ *     top level) so this file is safe to even *exist* in a build
+ *     that targets Edge for some routes.
  */
 
-export const ADMIN_COOKIE = "fitmeal_admin_session";
+// Re-export so existing imports (`import { ADMIN_COOKIE } from "@/lib/auth"`)
+// keep working without forcing every caller to switch files.
+export { ADMIN_COOKIE };
 
 const MIN_PASSWORD_LENGTH = 8;
-
-// Once-per-process random value baked into the cookie hash. Restarting
-// the server (or Vercel rebuilding) invalidates outstanding sessions.
-const PROCESS_SECRET = randomBytes(32).toString("hex");
 
 interface AdminConfig {
   password: string;
@@ -30,6 +37,13 @@ interface AdminConfig {
 }
 
 let cached: AdminConfig | null = null;
+let processSecret: string | null = null;
+
+function getProcessSecret(): string {
+  if (processSecret) return processSecret;
+  processSecret = randomBytes(32).toString("hex");
+  return processSecret;
+}
 
 /**
  * Read and validate the admin password from the environment. In
@@ -67,7 +81,7 @@ export function getAdminConfig(): AdminConfig | null {
 
 function makeConfig(password: string): AdminConfig {
   const cookieValue = createHash("sha256")
-    .update(PROCESS_SECRET)
+    .update(getProcessSecret())
     .update("|")
     .update(password)
     .digest("hex");
