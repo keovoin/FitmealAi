@@ -108,6 +108,29 @@ export function resolveProviderById(id: AIProviderId): ResolvedAIProvider {
 }
 
 /**
+ * Resolve a provider for the IMAGE leg of a generation request.
+ *
+ * Returns the active provider when it has an image model configured.
+ * Otherwise falls back to the OpenAI cloud if `OPENAI_API_KEY` is
+ * set — that lets admins keep using Kiro AI / a custom endpoint for
+ * the (cheap) text leg while still getting hero images via OpenAI's
+ * `gpt-image-1`. Returns `null` when no image-capable provider is
+ * available, in which case the caller should skip image generation
+ * with a warning instead of failing the whole request.
+ */
+export function resolveImageProvider(
+  active: ResolvedAIProvider,
+): ResolvedAIProvider | null {
+  if (active.supportsImages && active.imageModel) {
+    return active;
+  }
+  if (hasOpenAIEnv()) {
+    return resolveOpenAIProvider();
+  }
+  return null;
+}
+
+/**
  * `true` when at least ONE provider is fully configured. Used by
  * `/api/ai/meal-plan` to short-circuit with 503 before consulting
  * `app_settings`.

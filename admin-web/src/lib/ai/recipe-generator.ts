@@ -4,6 +4,7 @@ import {
   AIProviderConfigError,
   getDailyBudget,
   resolveActiveAIProvider,
+  resolveImageProvider,
   type ResolvedAIProvider,
 } from "./openai";
 import { normalizeRecipe, parseLooseJson, parseWithEnvelope } from "./json-parse";
@@ -241,18 +242,30 @@ export async function generateRecipeForAdmin(
   });
 
   // 4. Optional hero image. Best-effort: a failed image doesn't kill
-  //    the recipe — we just surface a warning. Skip silently when the
-  //    active provider is custom and CUSTOM_AI_IMAGE_MODEL was left
-  //    blank (most self-hosted endpoints don't expose images.generate).
+  //    the recipe — we just surface a warning. When the active text
+  //    provider can't generate images (Kiro AI / custom without an
+  //    image model), fall back to OpenAI's gpt-image-1 if
+  //    OPENAI_API_KEY is configured. Most admins want a hero image
+  //    even if their text provider is the cheap one.
   let imageUrl: string | null = null;
   if (opts.withImage) {
-    if (!provider.supportsImages) {
+    const imageProvider = resolveImageProvider(provider);
+    if (!imageProvider) {
       warnings.push(
-        `Image generation skipped — active AI provider (${provider.id}) has no image model configured. Upload a hero image manually.`,
+        `Image generation skipped — active AI provider (${provider.id}) has no image model and OPENAI_API_KEY isn't set as a fallback. Upload a hero image manually.`,
       );
     } else {
       try {
-        imageUrl = await generateAndUploadImage(parsed, provider, opts.adminUserId);
+        imageUrl = await generateAndUploadImage(
+          parsed,
+          imageProvider,
+          opts.adminUserId,
+        );
+        if (imageUrl && imageProvider.id !== provider.id) {
+          warnings.push(
+            `Hero image generated via ${imageProvider.id} (active provider ${provider.id} doesn't support images).`,
+          );
+        }
       } catch (err) {
         const detail =
           err instanceof Error ? err.message.slice(0, 200) : "unknown";

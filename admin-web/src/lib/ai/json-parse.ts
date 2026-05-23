@@ -175,25 +175,31 @@ export function normalizeIngredient(obj: unknown): unknown {
   return {
     ...o,
     name: firstDefined(o, ["name", "ingredient", "item", "food", "label"]),
-    grams: firstDefined(o, [
-      "grams",
-      "weight_g",
-      "weight",
-      "quantity_g",
-      "quantity",
-      "amount_g",
-      "amount",
-    ]),
-    calories: firstDefined(o, ["calories", "kcal", "cal"]),
-    protein_g: firstDefined(o, ["protein_g", "protein", "proteinGrams"]),
-    carbs_g: firstDefined(o, [
-      "carbs_g",
-      "carbs",
-      "carbohydrates_g",
-      "carbohydrates",
-      "carbsGrams",
-    ]),
-    fat_g: firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"]),
+    grams: coerceNumber(
+      firstDefined(o, [
+        "grams",
+        "weight_g",
+        "weight",
+        "quantity_g",
+        "quantity",
+        "amount_g",
+        "amount",
+      ]),
+    ),
+    calories: coerceNumber(firstDefined(o, ["calories", "kcal", "cal"])),
+    protein_g: coerceNumber(
+      firstDefined(o, ["protein_g", "protein", "proteinGrams"]),
+    ),
+    carbs_g: coerceNumber(
+      firstDefined(o, [
+        "carbs_g",
+        "carbs",
+        "carbohydrates_g",
+        "carbohydrates",
+        "carbsGrams",
+      ]),
+    ),
+    fat_g: coerceNumber(firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"])),
   };
 }
 
@@ -211,23 +217,30 @@ export function normalizeRecipeShape(obj: unknown): unknown {
   return {
     ...o,
     meal_type: firstDefined(o, ["meal_type", "mealType", "type", "category"]),
-    cook_time_minutes: firstDefined(o, [
-      "cook_time_minutes",
-      "cookTimeMinutes",
-      "cook_time",
-      "cookTime",
-      "prep_time_minutes",
-      "prepTimeMinutes",
-    ]),
-    protein_g: firstDefined(o, ["protein_g", "protein", "proteinGrams"]),
-    carbs_g: firstDefined(o, [
-      "carbs_g",
-      "carbs",
-      "carbohydrates_g",
-      "carbohydrates",
-      "carbsGrams",
-    ]),
-    fat_g: firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"]),
+    cook_time_minutes: coerceNumber(
+      firstDefined(o, [
+        "cook_time_minutes",
+        "cookTimeMinutes",
+        "cook_time",
+        "cookTime",
+        "prep_time_minutes",
+        "prepTimeMinutes",
+      ]),
+    ),
+    calories: coerceNumber(firstDefined(o, ["calories", "kcal", "cal"])),
+    protein_g: coerceNumber(
+      firstDefined(o, ["protein_g", "protein", "proteinGrams"]),
+    ),
+    carbs_g: coerceNumber(
+      firstDefined(o, [
+        "carbs_g",
+        "carbs",
+        "carbohydrates_g",
+        "carbohydrates",
+        "carbsGrams",
+      ]),
+    ),
+    fat_g: coerceNumber(firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"])),
     recipe_steps: firstDefined(o, [
       "recipe_steps",
       "recipeSteps",
@@ -292,6 +305,36 @@ function firstDefined(
     }
   }
   return undefined;
+}
+
+/**
+ * Coerce a value into a number when possible. The model occasionally
+ * returns numeric fields as strings (`"150"` instead of `150`),
+ * which then fails zod's `z.number()` check downstream — apply this
+ * to known-numeric ingredient/recipe fields inside the normalizers
+ * so the downstream schemas don't have to relax their types.
+ *
+ * Strings are parsed via `Number()` after stripping anything other
+ * than digits, dot, and minus (catches `"150g"` or `"150 grams"`
+ * occasionally emitted alongside the unit). Returns the original
+ * value when coercion isn't possible so zod can emit its normal
+ * "expected number" message.
+ */
+function coerceNumber(v: unknown): unknown {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed === "") return v;
+    // Fast path: pure number
+    const direct = Number(trimmed);
+    if (Number.isFinite(direct)) return direct;
+    // Strip units like "150g" or "1,200 kcal".
+    const cleaned = trimmed.replace(/[^\d.\-]/g, "");
+    if (cleaned === "" || cleaned === "-" || cleaned === ".") return v;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : v;
+  }
+  return v;
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   AIProviderConfigError,
   getDailyBudget,
   resolveActiveAIProvider,
+  resolveImageProvider,
   type ResolvedAIProvider,
 } from "./openai";
 import {
@@ -238,10 +239,22 @@ export async function generateMealPlan(
   });
 
   // ---- 6. Per-meal: cache lookup -> image gen -> persist ----------------
+  // Image leg may use a different provider than text — when the
+  // active provider can't generate images (e.g. Kiro AI without an
+  // image model), `resolveImageProvider` falls back to OpenAI if its
+  // env is set, so meal cards still get hero images.
+  const imageProvider = resolveImageProvider(provider);
   const result: MealPlanOutcome["meals"] = [];
   let position = 0;
   for (const meal of parsed.meals) {
-    const item = await persistMeal(req.user_id, planId, position, meal, provider);
+    const item = await persistMeal(
+      req.user_id,
+      planId,
+      position,
+      meal,
+      provider,
+      imageProvider,
+    );
     result.push(item);
     position += 1;
   }
@@ -344,6 +357,7 @@ async function persistMeal(
   position: number,
   meal: GeneratedMeal,
   provider: ResolvedAIProvider,
+  imageProvider: ResolvedAIProvider | null,
 ): Promise<MealPlanOutcome["meals"][number]> {
   const sb = getSupabaseAdmin();
   const slug = slugify(meal.title);
@@ -424,7 +438,9 @@ async function persistMeal(
   }
 
   // New meal: generate an image, upload, store the URL.
-  const imageUrl = await generateAndStoreImage(userId, mealId, meal, provider);
+  const imageUrl = imageProvider
+    ? await generateAndStoreImage(userId, mealId, meal, imageProvider)
+    : null;
 
   return {
     meal_id: mealId,
@@ -448,11 +464,9 @@ async function generateAndStoreImage(
   meal: GeneratedMeal,
   provider: ResolvedAIProvider,
 ): Promise<string | null> {
-  // Self-hosted endpoints often don't expose an /images/generations
-  // route. When the admin selects "custom" without setting
-  // CUSTOM_AI_IMAGE_MODEL, we silently skip image generation — the
-  // meal text still goes out, the image_url stays null, and the
-  // mobile app's GlassCard renders a placeholder.
+  // resolveImageProvider() guarantees provider.supportsImages and
+  // provider.imageModel are set when this is called; the early-out
+  // below is defensive in case a future caller bypasses the resolver.
   if (!provider.supportsImages || !provider.imageModel) {
     return null;
   }
