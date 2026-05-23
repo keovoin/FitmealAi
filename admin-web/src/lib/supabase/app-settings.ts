@@ -28,9 +28,12 @@ export interface AbaPaymentSettings {
   allowedRegions: string[];
 }
 
+// Default while the manual ABA flow is hidden from the product. Mobile
+// clients always hide the "Pay with ABA" button when this is false.
+// Admins can re-enable it from /payment-settings (still reachable by URL).
 const DEFAULT_ABA: AbaPaymentSettings = {
-  enabled: true,
-  allowedRegions: ["KH"],
+  enabled: false,
+  allowedRegions: [],
 };
 
 /**

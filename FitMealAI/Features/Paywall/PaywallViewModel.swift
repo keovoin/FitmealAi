@@ -54,13 +54,11 @@ final class PaywallViewModel: ObservableObject {
     }
 
     /// Whether to show the "Pay with ABA (manual)" secondary button.
-    /// True only when the admin has the toggle on AND the caller's
-    /// resolved country is on the allow-list.
-    var isAbaPaymentAvailable: Bool {
-        // Default-true for previews so the SwiftUI #Preview still renders
-        // both buttons; the live path overrides this once the options
-        // service has responded.
-        guard paymentOptionsService != nil else { return true }
+    /// Now defaults to false until the admin explicitly re-enables ABA
+    /// in /payment-settings (the manual flow is hidden product-wide
+    /// while the app expands beyond Cambodia).
+    var isAbaAvailable: Bool {
+        guard paymentOptionsService != nil else { return false }
         return paymentOptions.aba_payment.available_for_user
     }
 
