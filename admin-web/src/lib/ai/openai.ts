@@ -4,13 +4,18 @@ import { getAIProviderSettings, type AIProviderId } from "@/lib/supabase/ai-prov
 
 /**
  * Resolve which AI provider to use on each request, based on the
- * `ai_provider.text` row in `app_settings`. Two providers are
+ * `ai_provider.text` row in `app_settings`. Three providers are
  * supported:
  *
  *   - "openai" — the OpenAI cloud, configured via `OPENAI_*` env vars
  *   - "custom" — any OpenAI-compatible endpoint (vLLM, Together,
  *                Anyscale, Ollama with the OpenAI compat layer, your
  *                own self-hosted build), configured via `CUSTOM_AI_*`
+ *   - "kiro"   — the Kiro AI gateway (also OpenAI-compatible), kept
+ *                as a separate slot so admins can have BOTH a
+ *                self-hosted endpoint AND Kiro configured at once and
+ *                flip between them without re-editing env vars.
+ *                Configured via `KIRO_AI_*`.
  *
  * The admin flips between them in /ai-settings without a redeploy. The
  * actual base URL + API key live in env vars on Vercel; the
@@ -43,6 +48,12 @@ export interface ResolvedAIProvider {
 export interface ProviderEnvStatus {
   openai: { hasApiKey: boolean };
   custom: {
+    hasBaseUrl: boolean;
+    hasApiKey: boolean;
+    hasTextModel: boolean;
+    hasImageModel: boolean;
+  };
+  kiro: {
     hasBaseUrl: boolean;
     hasApiKey: boolean;
     hasTextModel: boolean;
@@ -82,6 +93,9 @@ export function resolveProviderById(id: AIProviderId): ResolvedAIProvider {
   if (id === "custom") {
     return resolveCustomProvider();
   }
+  if (id === "kiro") {
+    return resolveKiroProvider();
+  }
   return resolveOpenAIProvider();
 }
 
@@ -91,7 +105,7 @@ export function resolveProviderById(id: AIProviderId): ResolvedAIProvider {
  * `app_settings`.
  */
 export function isAIConfigured(): boolean {
-  return hasOpenAIEnv() || hasCustomEnv();
+  return hasOpenAIEnv() || hasCustomEnv() || hasKiroEnv();
 }
 
 /**
@@ -106,6 +120,12 @@ export function getProviderEnvStatus(): ProviderEnvStatus {
       hasApiKey: !!process.env.CUSTOM_AI_API_KEY?.trim(),
       hasTextModel: !!process.env.CUSTOM_AI_TEXT_MODEL?.trim(),
       hasImageModel: !!process.env.CUSTOM_AI_IMAGE_MODEL?.trim(),
+    },
+    kiro: {
+      hasBaseUrl: !!process.env.KIRO_AI_BASE_URL?.trim(),
+      hasApiKey: !!process.env.KIRO_AI_API_KEY?.trim(),
+      hasTextModel: !!process.env.KIRO_AI_TEXT_MODEL?.trim(),
+      hasImageModel: !!process.env.KIRO_AI_IMAGE_MODEL?.trim(),
     },
   };
 }
@@ -170,6 +190,33 @@ function resolveCustomProvider(): ResolvedAIProvider {
   };
 }
 
+function resolveKiroProvider(): ResolvedAIProvider {
+  // Same shape as the custom provider — Kiro AI exposes an
+  // OpenAI-compatible REST surface — but kept separate so admins can
+  // have Kiro AND a self-hosted endpoint configured at once and
+  // toggle between them in /ai-settings without re-editing env vars.
+  const baseURL = process.env.KIRO_AI_BASE_URL?.trim();
+  const apiKey = process.env.KIRO_AI_API_KEY?.trim();
+  const missing: string[] = [];
+  if (!baseURL) missing.push("KIRO_AI_BASE_URL");
+  if (!apiKey) missing.push("KIRO_AI_API_KEY");
+  if (missing.length > 0) {
+    throw new AIProviderConfigError(
+      `Kiro AI is selected but ${missing.join(" and ")} ${missing.length === 1 ? "is" : "are"} not set on Vercel. Add the env var(s) and redeploy, or switch back to OpenAI in /ai-settings.`,
+      "kiro",
+    );
+  }
+  const textModel = process.env.KIRO_AI_TEXT_MODEL?.trim() || "default";
+  const rawImage = process.env.KIRO_AI_IMAGE_MODEL?.trim();
+  return {
+    id: "kiro",
+    client: new OpenAI({ apiKey: apiKey!, baseURL: baseURL! }),
+    textModel,
+    imageModel: rawImage ? rawImage : null,
+    supportsImages: !!rawImage,
+  };
+}
+
 function hasOpenAIEnv(): boolean {
   return !!process.env.OPENAI_API_KEY?.trim();
 }
@@ -178,6 +225,13 @@ function hasCustomEnv(): boolean {
   return (
     !!process.env.CUSTOM_AI_BASE_URL?.trim() &&
     !!process.env.CUSTOM_AI_API_KEY?.trim()
+  );
+}
+
+function hasKiroEnv(): boolean {
+  return (
+    !!process.env.KIRO_AI_BASE_URL?.trim() &&
+    !!process.env.KIRO_AI_API_KEY?.trim()
   );
 }
 

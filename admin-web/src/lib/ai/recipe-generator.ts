@@ -6,6 +6,7 @@ import {
   resolveActiveAIProvider,
   type ResolvedAIProvider,
 } from "./openai";
+import { parseLooseJson, parseWithEnvelope } from "./json-parse";
 import { buildImagePrompt } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -158,7 +159,11 @@ export async function generateRecipeForAdmin(
   } catch (err) {
     await logFailure(opts.adminUserId, "meal_plan", textModel, errorCode(err));
     const providerLabel =
-      provider.id === "custom" ? "Custom AI endpoint" : "OpenAI";
+      provider.id === "custom"
+        ? "Custom AI endpoint"
+        : provider.id === "kiro"
+          ? "Kiro AI"
+          : "OpenAI";
     return {
       ok: false,
       status: 502,
@@ -169,7 +174,11 @@ export async function generateRecipeForAdmin(
   const raw = textCompletion.choices[0]?.message?.content ?? "";
   let parsed: GeneratedRecipe;
   try {
-    parsed = GeneratedRecipeSchema.parse(JSON.parse(raw));
+    // The model occasionally returns `{"recipe": {...}}` instead of
+    // the flat object the prompt asks for, which used to surface as
+    // a confusing "title: undefined" zod error. parseWithEnvelope
+    // peels common wrapper keys before validating.
+    parsed = parseWithEnvelope(GeneratedRecipeSchema, parseLooseJson(raw));
   } catch (err) {
     await logFailure(
       opts.adminUserId,
