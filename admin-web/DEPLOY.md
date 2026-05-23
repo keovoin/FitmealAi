@@ -111,3 +111,17 @@ For AI meal generation, make sure these env vars are set:
 2. Add `OPENAI_API_KEY` to Vercel env vars
 3. Push the code
 4. Vercel deploys, the API endpoint goes live
+
+
+### Using your own AI instead of OpenAI
+
+If you've stood up your own OpenAI-compatible LLM (vLLM, Anyscale, Together, Ollama with the OpenAI compat layer, etc.) you can route every AI call through it without redeploying or touching code. Two steps:
+
+1. Add these env vars on Vercel and redeploy:
+   - `CUSTOM_AI_BASE_URL` — root of your endpoint, e.g. `https://my-llm.example.com/v1` (the OpenAI SDK appends `/chat/completions` automatically)
+   - `CUSTOM_AI_API_KEY` — bearer token your endpoint expects in `Authorization: Bearer …`
+   - `CUSTOM_AI_TEXT_MODEL` — *optional*. The model name your endpoint expects in the request body. Defaults to `default` when unset.
+   - `CUSTOM_AI_IMAGE_MODEL` — *optional*. Set this only if your endpoint exposes an `/images/generations` route. When unset, recipe and meal-plan image generation is gracefully skipped (mobile shows a placeholder).
+2. Open `/ai-settings` in the admin and switch the active provider to **Custom**. Effective immediately for every subsequent AI call — no deploy required to flip back to OpenAI.
+
+`OPENAI_API_KEY` and `CUSTOM_AI_*` can coexist; the active choice in `/ai-settings` decides which one each AI request hits.

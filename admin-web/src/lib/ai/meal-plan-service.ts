@@ -1,6 +1,11 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { getOpenAI, getTextModel, getImageModel, getDailyBudget } from "./openai";
+import {
+  AIProviderConfigError,
+  getDailyBudget,
+  resolveActiveAIProvider,
+  type ResolvedAIProvider,
+} from "./openai";
 import {
   buildImagePrompt,
   buildMealPlanSystemPrompt,
@@ -109,8 +114,22 @@ export async function generateMealPlan(
   }
 
   // ---- 4. Generate meal text ---------------------------------------------
-  const openai = getOpenAI();
-  const textModel = getTextModel();
+  // Resolve the admin's selected provider once and re-use it for both
+  // the chat completion and the per-meal image generation. Failing
+  // here means the active provider's env vars aren't set; surface the
+  // operator-friendly error message verbatim so the mobile app can
+  // show the admin what to fix.
+  let provider: ResolvedAIProvider;
+  try {
+    provider = await resolveActiveAIProvider();
+  } catch (err) {
+    if (err instanceof AIProviderConfigError) {
+      return { ok: false, status: 503, reason: err.message };
+    }
+    return { ok: false, status: 500, reason: "ai_provider_resolve_failed" };
+  }
+  const openai = provider.client;
+  const textModel = provider.textModel;
 
   let textCompletion;
   try {
@@ -201,7 +220,7 @@ export async function generateMealPlan(
   const result: MealPlanOutcome["meals"] = [];
   let position = 0;
   for (const meal of parsed.meals) {
-    const item = await persistMeal(req.user_id, planId, position, meal);
+    const item = await persistMeal(req.user_id, planId, position, meal, provider);
     result.push(item);
     position += 1;
   }
@@ -303,6 +322,7 @@ async function persistMeal(
   planId: string,
   position: number,
   meal: GeneratedMeal,
+  provider: ResolvedAIProvider,
 ): Promise<MealPlanOutcome["meals"][number]> {
   const sb = getSupabaseAdmin();
   const slug = slugify(meal.title);
@@ -317,7 +337,7 @@ async function persistMeal(
     p_fat_g: meal.fat_g,
     p_ingredients: meal.ingredients,
     p_recipe_steps: meal.recipe_steps,
-    p_model: getTextModel(),
+    p_model: provider.textModel,
   });
   if (error || !upsertRows) {
     return {
@@ -356,7 +376,7 @@ async function persistMeal(
       user_id: userId,
       kind: "meal_image",
       meal_id: mealId,
-      model: getImageModel(),
+      model: provider.imageModel ?? provider.textModel,
       cost_usd_micro: 0,
       cache_hit: true,
       succeeded: true,
@@ -383,7 +403,7 @@ async function persistMeal(
   }
 
   // New meal: generate an image, upload, store the URL.
-  const imageUrl = await generateAndStoreImage(userId, mealId, meal);
+  const imageUrl = await generateAndStoreImage(userId, mealId, meal, provider);
 
   return {
     meal_id: mealId,
@@ -405,10 +425,19 @@ async function generateAndStoreImage(
   userId: string,
   mealId: string,
   meal: GeneratedMeal,
+  provider: ResolvedAIProvider,
 ): Promise<string | null> {
+  // Self-hosted endpoints often don't expose an /images/generations
+  // route. When the admin selects "custom" without setting
+  // CUSTOM_AI_IMAGE_MODEL, we silently skip image generation — the
+  // meal text still goes out, the image_url stays null, and the
+  // mobile app's GlassCard renders a placeholder.
+  if (!provider.supportsImages || !provider.imageModel) {
+    return null;
+  }
   const sb = getSupabaseAdmin();
-  const openai = getOpenAI();
-  const imageModel = getImageModel();
+  const openai = provider.client;
+  const imageModel = provider.imageModel;
   const prompt = buildImagePrompt(meal.image_prompt, meal.title);
 
   let imageResp;
