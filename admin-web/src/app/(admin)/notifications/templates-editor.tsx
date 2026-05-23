@@ -10,7 +10,7 @@ import {
   type NotificationTemplate,
   type NotificationTemplates,
   type NotificationType,
-} from "@/lib/supabase/notification-templates";
+} from "@/lib/supabase/notification-templates-shared";
 import { Check, RotateCcw } from "lucide-react";
 import { useState, useTransition } from "react";
 
