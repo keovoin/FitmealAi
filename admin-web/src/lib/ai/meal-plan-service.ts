@@ -12,6 +12,7 @@ import {
   buildMealPlanUserPrompt,
 } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
+import { parseLooseJson } from "./json-parse";
 import {
   GeneratedMeal,
   GeneratedPlanSchema,
@@ -154,7 +155,10 @@ export async function generateMealPlan(
   const rawText = textCompletion.choices[0]?.message?.content ?? "";
   let parsed;
   try {
-    parsed = GeneratedPlanSchema.parse(JSON.parse(rawText));
+    // Defensive: some models wrap JSON in ```json fences even when
+    // response_format: { type: "json_object" } is set. parseLooseJson
+    // strips a single surrounding fence before delegating to JSON.parse.
+    parsed = GeneratedPlanSchema.parse(parseLooseJson(rawText));
   } catch {
     await logFailedGeneration(req.user_id, "meal_plan", textModel, "schema_invalid");
     return {

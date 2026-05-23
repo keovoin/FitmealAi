@@ -8,6 +8,7 @@ import {
 } from "./openai";
 import { buildImagePrompt } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
+import { parseLooseJson } from "./json-parse";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { uploadRecipeImage } from "@/lib/supabase/storage";
 import {
@@ -169,7 +170,10 @@ export async function generateRecipeForAdmin(
   const raw = textCompletion.choices[0]?.message?.content ?? "";
   let parsed: GeneratedRecipe;
   try {
-    parsed = GeneratedRecipeSchema.parse(JSON.parse(raw));
+    // Defensive: some models wrap JSON in ```json fences even when
+    // response_format: { type: "json_object" } is set. parseLooseJson
+    // strips a single surrounding fence before delegating to JSON.parse.
+    parsed = GeneratedRecipeSchema.parse(parseLooseJson(raw));
   } catch (err) {
     await logFailure(
       opts.adminUserId,
