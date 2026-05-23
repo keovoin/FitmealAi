@@ -12,6 +12,7 @@ import {
   buildMealPlanUserPrompt,
 } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
+import { parseLooseJson, parseWithEnvelope } from "./json-parse";
 import {
   GeneratedMeal,
   GeneratedPlanSchema,
@@ -154,7 +155,11 @@ export async function generateMealPlan(
   const rawText = textCompletion.choices[0]?.message?.content ?? "";
   let parsed;
   try {
-    parsed = GeneratedPlanSchema.parse(JSON.parse(rawText));
+    // Tolerate `{"meal_plan": {...}}` / `{"data": {...}}` envelopes
+    // that the model occasionally produces despite the system prompt.
+    // Without this, valid plans wrapped under `data` were failing
+    // schema validation with confusing "meals: required" errors.
+    parsed = parseWithEnvelope(GeneratedPlanSchema, parseLooseJson(rawText));
   } catch {
     await logFailedGeneration(req.user_id, "meal_plan", textModel, "schema_invalid");
     return {

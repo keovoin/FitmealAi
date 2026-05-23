@@ -1,7 +1,11 @@
 "use server";
 
 import { generateMealPlan } from "@/lib/ai/meal-plan-service";
-import { isAIConfigured } from "@/lib/ai/openai";
+import {
+  AIProviderConfigError,
+  isAIConfigured,
+  resolveProviderById,
+} from "@/lib/ai/openai";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
 import { setAbaPaymentSettings, type AbaPaymentSettings } from "./app-settings";
@@ -9,6 +13,11 @@ import {
   setAIProviderSettings,
   type AIProviderSettings,
 } from "./ai-provider";
+import {
+  isAIProviderId,
+  type AIProviderId,
+  type TestAIProviderResult,
+} from "./ai-provider-shared";
 import {
   setNotificationTemplates,
   type NotificationTemplates,
@@ -304,6 +313,90 @@ export async function updateAIProviderSettings(
   revalidatePath("/ai-settings");
   revalidatePath("/setup");
   return { ok: true };
+}
+
+/**
+ * Probe a specific AI provider by listing its models. Used by the
+ * "Test connection" button on each provider card in /ai-settings to
+ * verify Vercel env vars are wired up correctly BEFORE flipping the
+ * active provider — the alternative is generating a real meal plan
+ * which bills tokens and takes ~10 seconds.
+ *
+ * `models.list()` is the cheapest possible probe: it issues a single
+ * GET that doesn't consume tokens, works against every OpenAI-
+ * compatible endpoint we support (OpenAI cloud, Kiro AI, vLLM,
+ * Anyscale, Together, Ollama compat layer), and returns a stable
+ * shape we can summarize.
+ *
+ * Probes ANY provider, not just the active one — that's the whole
+ * point. The admin can confirm Kiro AI works while OpenAI is still
+ * the active choice.
+ */
+export async function testAIProviderAction(
+  id: AIProviderId,
+): Promise<TestAIProviderResult> {
+  if (!isAIProviderId(id)) {
+    return { ok: false, error: `Unknown AI provider id: ${String(id)}` };
+  }
+
+  let provider;
+  try {
+    provider = resolveProviderById(id);
+  } catch (err) {
+    if (err instanceof AIProviderConfigError) {
+      return { ok: false, error: err.message };
+    }
+    return {
+      ok: false,
+      error: (err as Error).message ?? "Failed to resolve provider.",
+    };
+  }
+
+  try {
+    const list = await provider.client.models.list();
+    // The OpenAI SDK exposes either a paginated `Page` (with `.data`)
+    // or an async iterator depending on the endpoint. Handle both
+    // shapes, but cap iteration so a self-hosted endpoint returning
+    // a 1000-model catalog doesn't hang us.
+    const ids: string[] = [];
+    let total = 0;
+    const data = (list as { data?: Array<{ id?: string }> }).data;
+    if (Array.isArray(data)) {
+      total = data.length;
+      for (const m of data.slice(0, 5)) {
+        if (m && typeof m.id === "string") ids.push(m.id);
+      }
+    } else {
+      // Fallback for iterator-style responses.
+      for await (const m of list as AsyncIterable<{ id?: string }>) {
+        total += 1;
+        if (ids.length < 5 && m && typeof m.id === "string") {
+          ids.push(m.id);
+        }
+        if (total >= 200) break;
+      }
+    }
+    return { ok: true, modelCount: total, sampleModels: ids };
+  } catch (err) {
+    return {
+      ok: false,
+      error: humanizeProviderError(err),
+    };
+  }
+}
+
+function humanizeProviderError(err: unknown): string {
+  // OpenAI SDK errors expose `status` + `message`; surface both so
+  // the admin can tell auth failures apart from connectivity issues.
+  if (err && typeof err === "object") {
+    const e = err as { status?: number; message?: string; code?: string };
+    if (e.status && e.message) {
+      return `HTTP ${e.status}: ${e.message}`;
+    }
+    if (e.message) return e.message;
+  }
+  if (err instanceof Error) return err.message;
+  return "Unknown error.";
 }
 
 

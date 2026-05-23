@@ -51,7 +51,7 @@ export async function setAIProviderSettings(value: AIProviderSettings): Promise<
       key: AI_PROVIDER_KEYS.active,
       value: value.active as unknown as object,
       description:
-        'Which provider serves AI requests. One of "openai" or "custom".',
+        'Which provider serves AI requests. One of "openai", "custom", or "kiro".',
     },
     { onConflict: "key" },
   );
