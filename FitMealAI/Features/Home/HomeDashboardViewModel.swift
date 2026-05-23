@@ -100,6 +100,14 @@ final class HomeDashboardViewModel: ObservableObject {
         habits[idx].isCompleted.toggle()
     }
 
+    /// Replaces the displayed plan with the recipes returned by
+    /// /api/recipes/shuffle. Swift's `@Published` triggers a redraw on
+    /// the Home tab so the calorie ring + meal card update in place.
+    func applyShuffleResult(_ result: ShuffleResult) {
+        mealPlan = result.mealPlan
+        errorMessage = nil
+    }
+
     /// Stub. Phase-3 will trigger AIService to regenerate the day's plan.
     func regeneratePlan(aiService: AIService? = nil, mealPrefs: MealPrefs = .default) async {
         guard let aiService else {
