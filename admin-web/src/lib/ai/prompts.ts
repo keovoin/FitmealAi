@@ -17,6 +17,7 @@ export function buildMealPlanSystemPrompt(): string {
     "  - Provide grams, calories, and macros per ingredient",
     "  - Keep recipe steps short (1-2 sentences each), no fluff",
     "Output EXCLUSIVELY a single JSON object that matches the schema. Do not wrap in markdown.",
+    'CRITICAL: The top-level JSON object must have exactly ONE key: "meals", whose value is the array of meal objects. Do NOT wrap the response under "data", "result", "meal_plan", "response", or any other envelope key.',
     "For each meal, include an `image_prompt` of 1-2 sentences describing the finished dish on a plate, ready for a photographer.",
   ].join("\n");
 }

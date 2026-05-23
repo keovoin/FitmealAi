@@ -174,10 +174,13 @@ export async function generateRecipeForAdmin(
   const raw = textCompletion.choices[0]?.message?.content ?? "";
   let parsed: GeneratedRecipe;
   try {
-    // The model occasionally returns `{"recipe": {...}}` instead of
-    // the flat object the prompt asks for, which used to surface as
-    // a confusing "title: undefined" zod error. parseWithEnvelope
-    // peels common wrapper keys before validating.
+    // The model occasionally returns `{"recipe": {...}}` or some
+    // other envelope key instead of the flat object the prompt asks
+    // for, which used to surface as a confusing "title: undefined"
+    // zod error. parseWithEnvelope peels known wrapper keys, then
+    // does a bounded recursive search before validating, and on
+    // failure throws an Error whose message starts with the observed
+    // top-level shape (e.g. "{recipe, meta}: title: Required").
     parsed = parseWithEnvelope(GeneratedRecipeSchema, parseLooseJson(raw));
   } catch (err) {
     await logFailure(
@@ -187,7 +190,20 @@ export async function generateRecipeForAdmin(
       "schema_invalid",
     );
     const detail =
-      err instanceof Error ? err.message.slice(0, 120) : "unknown";
+      err instanceof Error ? err.message.slice(0, 220) : "unknown";
+    // Push the full raw output (truncated) into Vercel logs so we can
+    // spot new envelope patterns the parser missed without bloating
+    // the user-facing 502 payload.
+    const rawPreview = raw.slice(0, 240).replace(/\s+/g, " ");
+    console.warn(
+      "[recipe-generator] schema_invalid",
+      JSON.stringify({
+        request_id: textCompletion.id,
+        model: textModel,
+        detail,
+        raw_preview: rawPreview,
+      }),
+    );
     return {
       ok: false,
       status: 502,
@@ -261,6 +277,11 @@ const SYSTEM_PROMPT = [
   "calories, and per-ingredient macros so the per-serving totals on the",
   "recipe equal the sum of the ingredients.",
   "Return EXACTLY one JSON object that matches the schema. No markdown.",
+  'CRITICAL: The top-level JSON keys MUST be exactly: title, description,',
+  "meal_type, cook_time_minutes, diets, allergens, tags, calories,",
+  "protein_g, carbs_g, fat_g, ingredients, recipe_steps, image_prompt.",
+  'Do NOT wrap the response under "recipe", "data", "result", or any',
+  "other envelope key — the title field must be at the root.",
   "Include an `image_prompt` of 1-2 sentences describing the finished",
   "dish on a plate, ready for a photographer.",
 ].join("\n");

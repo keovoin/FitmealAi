@@ -155,13 +155,25 @@ export async function generateMealPlan(
   const rawText = textCompletion.choices[0]?.message?.content ?? "";
   let parsed;
   try {
-    // Tolerate `{"meal_plan": {...}}` / `{"data": {...}}` envelopes
-    // that the model occasionally produces despite the system prompt.
-    // Without this, valid plans wrapped under `data` were failing
-    // schema validation with confusing "meals: required" errors.
+    // Tolerate `{"meal_plan": {...}}` / `{"data": {...}}` / unknown
+    // envelope wrappers that the model occasionally produces despite
+    // the system prompt. parseWithEnvelope tries direct, peels known
+    // keys, walks the object tree, and on failure throws an Error
+    // whose message starts with the observed top-level shape.
     parsed = parseWithEnvelope(GeneratedPlanSchema, parseLooseJson(rawText));
-  } catch {
+  } catch (err) {
     await logFailedGeneration(req.user_id, "meal_plan", textModel, "schema_invalid");
+    const detail = err instanceof Error ? err.message.slice(0, 220) : "unknown";
+    const rawPreview = rawText.slice(0, 240).replace(/\s+/g, " ");
+    console.warn(
+      "[meal-plan-service] schema_invalid",
+      JSON.stringify({
+        request_id: textCompletion.id,
+        model: textModel,
+        detail,
+        raw_preview: rawPreview,
+      }),
+    );
     return {
       ok: false,
       status: 502,
