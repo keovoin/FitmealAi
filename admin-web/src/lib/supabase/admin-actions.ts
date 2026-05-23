@@ -301,6 +301,16 @@ import {
   type RecipeWriteInput,
   type RecipeStatus,
 } from "./recipes-queries";
+import {
+  generateRecipeForAdmin,
+  type GenerateRecipeOptions,
+  type GenerateRecipeResult,
+} from "@/lib/ai/recipe-generator";
+import { parseBulkRecipesJson } from "@/lib/recipes/bulk-import";
+import {
+  StorageUploadError,
+  uploadRecipeImage,
+} from "./storage";
 
 /**
  * Persist the per-tier daily quotas (Free/Silver/Gold AI + shuffles).
@@ -398,4 +408,133 @@ export async function transitionRecipe(
   revalidatePath("/recipes");
   revalidatePath(`/recipes/${id}`);
   return { ok: true };
+}
+
+// ===========================================================================
+// Phase 5b: image upload, bulk import, AI generate
+// ===========================================================================
+
+/**
+ * Receive a file from the recipe form's image picker, upload it to
+ * the public `recipe-images` bucket, and return the CDN URL the form
+ * should persist into `recipes.image_url`.
+ *
+ * Server actions accept binary payloads via `FormData`, which sidesteps
+ * the 4.5 MB body limit on traditional Vercel API routes. We still cap
+ * uploads at 8 MB inside `uploadRecipeImage` to be polite.
+ */
+export async function uploadRecipeImageAction(
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  const file = formData.get("file");
+  const slug = (formData.get("slug") as string | null) ?? undefined;
+
+  if (!(file instanceof Blob)) {
+    return { ok: false, error: "No file provided." };
+  }
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const contentType = file.type || "application/octet-stream";
+    const uploaded = await uploadRecipeImage({ buffer, contentType, slug });
+    return { ok: true, url: uploaded.url };
+  } catch (error) {
+    if (error instanceof StorageUploadError) {
+      return { ok: false, error: error.message };
+    }
+    return {
+      ok: false,
+      error: (error as Error).message ?? "Upload failed.",
+    };
+  }
+}
+
+/**
+ * Bulk-insert N draft recipes from a parsed JSON file. Each row is
+ * inserted independently so a single broken row doesn't sink the
+ * batch — the response separates successes from failures so the UI
+ * can render a per-row table.
+ */
+export async function bulkUploadRecipesAction(input: {
+  payload: string;
+}): Promise<{
+  ok: true;
+  total: number;
+  inserted: number;
+  failed: { index: number; error: string }[];
+  fileErrors: string[];
+} | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+
+  const report = parseBulkRecipesJson(input.payload);
+  if (report.fileErrors.length > 0 && report.validRows.length === 0) {
+    return {
+      ok: true,
+      total: report.total,
+      inserted: 0,
+      failed: report.invalidRows.map((r) => ({
+        index: r.index,
+        error: r.error,
+      })),
+      fileErrors: report.fileErrors,
+    };
+  }
+
+  const failed: { index: number; error: string }[] = [
+    ...report.invalidRows.map((r) => ({ index: r.index, error: r.error })),
+  ];
+  let inserted = 0;
+
+  // Insert sequentially so we don't hammer the connection pool — the
+  // expected batch size is small (< 200) and DB writes are quick.
+  for (const row of report.validRows) {
+    try {
+      await upsertRecipe(row.recipe);
+      inserted += 1;
+    } catch (error) {
+      failed.push({
+        index: row.index,
+        error: (error as Error).message ?? "Unknown DB error",
+      });
+    }
+  }
+
+  if (inserted > 0) {
+    revalidatePath("/recipes");
+  }
+
+  return {
+    ok: true,
+    total: report.total,
+    inserted,
+    failed,
+    fileErrors: report.fileErrors,
+  };
+}
+
+/**
+ * One-shot AI recipe generator for the admin dashboard. Returns the
+ * generated recipe + image URL (if requested) so the form can pre-fill
+ * — does NOT persist. The admin reviews and clicks "Create draft" the
+ * usual way.
+ */
+export async function aiGenerateRecipeAction(
+  options: Omit<GenerateRecipeOptions, "adminUserId">,
+): Promise<
+  | { ok: true; result: GenerateRecipeResult }
+  | { ok: false; error: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  const outcome = await generateRecipeForAdmin(options);
+  if (!outcome.ok) {
+    return { ok: false, error: outcome.error };
+  }
+  return { ok: true, result: outcome.result };
 }
