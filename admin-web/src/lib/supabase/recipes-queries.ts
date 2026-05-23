@@ -1,77 +1,21 @@
 import "server-only";
 import { getSupabaseAdmin } from "./server";
+import {
+  slugifyTitle,
+  type MealType,
+  type Recipe,
+  type RecipeIngredient,
+  type RecipeListSummary,
+  type RecipeSource,
+  type RecipeStats,
+  type RecipeStatus,
+  type RecipeWriteInput,
+} from "./recipes-shared";
 
-/**
- * Server-side query layer for the recipes catalog. All reads/writes go
- * through the service role; mobile clients use a separate, narrower
- * route (`/api/recipes/shuffle`) that respects RLS.
- */
-
-export type RecipeStatus = "draft" | "published" | "archived";
-export type RecipeSource = "ai_generated" | "curated" | "imported";
-export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
-
-export interface RecipeIngredient {
-  name: string;
-  grams: number;
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
-  fatGrams: number;
-}
-
-export interface Recipe {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  mealType: MealType;
-  diets: string[];
-  allergens: string[];
-  tags: string[];
-  cookTimeMinutes: number | null;
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
-  fatGrams: number;
-  ingredients: RecipeIngredient[];
-  recipeSteps: string[];
-  imageUrl: string | null;
-  thumbnailUrl: string | null;
-  source: RecipeSource;
-  status: RecipeStatus;
-  popularityScore: number;
-  viewCount: number;
-  likeCount: number;
-  createdBy: string | null;
-  approvedBy: string | null;
-  approvedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface RecipeListSummary {
-  id: string;
-  slug: string;
-  title: string;
-  mealType: MealType;
-  status: RecipeStatus;
-  source: RecipeSource;
-  diets: string[];
-  calories: number;
-  cookTimeMinutes: number | null;
-  thumbnailUrl: string | null;
-  createdAt: string;
-}
-
-export interface RecipeStats {
-  total: number;
-  published: number;
-  drafts: number;
-  archived: number;
-  byMealType: Record<MealType, number>;
-  publishedByMealType: Record<MealType, number>;
-}
+// Re-export the isomorphic surface so existing server-side imports of
+// `./recipes-queries` keep working. Client code MUST import from
+// `./recipes-shared` -- this module pulls in `server-only`.
+export * from "./recipes-shared";
 
 interface RecipeRow {
   id: string;
@@ -231,47 +175,10 @@ export async function getRecipeStats(): Promise<RecipeStats> {
   return stats;
 }
 
-export interface RecipeWriteInput {
-  slug?: string;
-  title: string;
-  description?: string | null;
-  mealType: MealType;
-  diets?: string[];
-  allergens?: string[];
-  tags?: string[];
-  cookTimeMinutes?: number | null;
-  calories: number;
-  proteinGrams?: number;
-  carbsGrams?: number;
-  fatGrams?: number;
-  ingredients?: RecipeIngredient[];
-  recipeSteps?: string[];
-  imageUrl?: string | null;
-  thumbnailUrl?: string | null;
-  source?: RecipeSource;
-  status?: RecipeStatus;
-  createdBy?: string | null;
-}
-
-/** Slugify a title for use as the recipe's stable URL key. */
-export function slugifyTitle(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-      .slice(0, 64) || `recipe-${Math.random().toString(36).slice(2, 10)}`
-  );
-}
-
 export async function upsertRecipe(input: RecipeWriteInput): Promise<Recipe> {
   const sb = getSupabaseAdmin();
   const slug = (input.slug?.trim() || slugifyTitle(input.title)).slice(0, 80);
 
-  // If a slug collision exists, suffix with a short random tail so the
-  // admin never gets a foot-gun unique constraint error in production.
   const { data: existing } = await sb
     .from("recipes")
     .select("id")
@@ -366,12 +273,6 @@ export async function setRecipeStatus(
   if (error) throw new Error(`setRecipeStatus: ${error.message}`);
 }
 
-/**
- * Mobile-facing shuffle. Picks N random `published` rows that match the
- * user's diet / allergen / cook-time prefs. Deliberately uses the
- * service role here -- the API route counts the request against the
- * user's daily quota with `bump_quota()` before calling this.
- */
 export async function shuffleForUser(opts: {
   userId: string;
   mealType: MealType;
@@ -391,8 +292,6 @@ export async function shuffleForUser(opts: {
     .eq("meal_type", mealType);
 
   if (allergens.length > 0) {
-    // overlaps any => exclude rows whose allergens overlap the user's.
-    // PostgREST has no direct "not overlaps" so use a json filter.
     req = req.not(
       "allergens",
       "ov",
@@ -410,8 +309,6 @@ export async function shuffleForUser(opts: {
   if (error) throw new Error(`shuffleForUser: ${error.message}`);
   const rows = ((data ?? []) as unknown as RecipeRow[]).map(mapRow);
 
-  // In-memory shuffle since Supabase has no `random()` ordering helper
-  // through PostgREST. 200 rows is fine for Fisher-Yates.
   for (let i = rows.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [rows[i], rows[j]] = [rows[j], rows[i]];

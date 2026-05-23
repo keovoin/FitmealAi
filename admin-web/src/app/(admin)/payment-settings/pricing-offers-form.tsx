@@ -7,7 +7,7 @@ import type {
   Audience,
   PricingOffers,
   TierOffers,
-} from "@/lib/supabase/pricing-offers";
+} from "@/lib/supabase/pricing-offers-shared";
 import { Check, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 

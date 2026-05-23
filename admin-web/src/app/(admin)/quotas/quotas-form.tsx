@@ -6,7 +6,7 @@ import { updateQuotaSettings } from "@/lib/supabase/admin-actions";
 import {
   formatQuota,
   type QuotaSettings,
-} from "@/lib/supabase/quota-settings";
+} from "@/lib/supabase/quota-settings-shared";
 import { Check, Sparkles, Shuffle } from "lucide-react";
 import { useState, useTransition } from "react";
 

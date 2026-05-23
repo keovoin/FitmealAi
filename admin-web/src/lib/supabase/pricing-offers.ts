@@ -1,77 +1,21 @@
 import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
+import {
+  DEFAULT_OFFERS,
+  type Audience,
+  type PricingOffers,
+  type TierOffers,
+} from "./pricing-offers-shared";
 
-/**
- * Admin-tunable pricing offers per paid tier (Silver, Gold). Two
- * independent levers per tier:
- *
- *   - Free trial: N days where the user gets paid-tier features at $0.
- *   - First-payment discount: percent off the first paid month.
- *
- * Each lever has its own enable/disable toggle and audience filter so
- * an admin can run "50% off first month for Cambodia only, Q1 2026" or
- * "3-day trial for first-time subscribers" without touching code.
- *
- * Stored as flat keys in `app_settings` so the existing audit trigger
- * (migration 0013) and RLS policy keep working unchanged.
- *
- * Mobile clients consume the resolved offers via /api/payments/options;
- * the actual price charged on StoreKit / Play Billing is configured
- * separately in App Store Connect / Play Console (admin sees a yellow
- * reminder note next to the discount fields).
- */
-
-export type Audience = "first_time" | "everyone" | "by_country";
-
-export interface TrialConfig {
-  enabled: boolean;
-  days: number;
-  audience: Audience;
-}
-
-export interface DiscountConfig {
-  enabled: boolean;
-  percentOff: number;
-  audience: Audience;
-  /** ISO-3166-1 alpha-2 (uppercase). Only used when audience = by_country. */
-  country: string;
-  /** ISO-8601 timestamp. null = always available while enabled. */
-  startsAt: string | null;
-  /** ISO-8601 timestamp. null = no end date. */
-  endsAt: string | null;
-}
-
-export interface TierOffers {
-  trial: TrialConfig;
-  discount: DiscountConfig;
-}
-
-export interface PricingOffers {
-  silver: TierOffers;
-  gold: TierOffers;
-}
-
-const DEFAULT_TIER: TierOffers = {
-  trial: { enabled: false, days: 0, audience: "first_time" },
-  discount: {
-    enabled: false,
-    percentOff: 50,
-    audience: "first_time",
-    country: "",
-    startsAt: null,
-    endsAt: null,
-  },
-};
-
-const DEFAULT_OFFERS: PricingOffers = {
-  silver: { ...DEFAULT_TIER, trial: { enabled: false, days: 3, audience: "first_time" } },
-  gold: DEFAULT_TIER,
-};
+// Re-export everything from the shared module so existing server-side
+// imports of `./pricing-offers` keep working unchanged. Client code
+// imports from `./pricing-offers-shared` instead because this file
+// pulls in `server-only`.
+export * from "./pricing-offers-shared";
 
 const TIERS = ["silver", "gold"] as const;
 type TierId = (typeof TIERS)[number];
 
-/** Build the flat list of app_settings keys we care about. */
 function tierKeys(tier: TierId) {
   return {
     trialEnabled: `pricing.${tier}.trial.enabled`,
@@ -150,11 +94,7 @@ export async function getPricingOffers(): Promise<PricingOffers> {
         },
         discount: {
           enabled: readBool(rows, k.discountEnabled, fallback.discount.enabled),
-          percentOff: readInt(
-            rows,
-            k.discountPercent,
-            fallback.discount.percentOff,
-          ),
+          percentOff: readInt(rows, k.discountPercent, fallback.discount.percentOff),
           audience: readAudience(rows, k.discountAudience, fallback.discount.audience),
           country: readString(rows, k.discountCountry, fallback.discount.country),
           startsAt: readDate(rows, k.discountStartsAt, fallback.discount.startsAt),
@@ -177,12 +117,10 @@ function clampDays(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(60, Math.trunc(n)));
 }
-
 function sanitizeCountry(s: string): string {
   const c = s.trim().toUpperCase();
   return /^[A-Z]{2}$/.test(c) ? c : "";
 }
-
 function sanitizeDate(s: string | null): string | null {
   if (s === null) return null;
   const t = s.trim();
@@ -221,59 +159,4 @@ export async function setPricingOffers(value: PricingOffers): Promise<void> {
 
   const { error } = await sb.from("app_settings").upsert(rows, { onConflict: "key" });
   if (error) throw new Error(error.message);
-}
-
-/**
- * Resolve the *effective* offer for a user at a moment in time.
- * Used by /api/payments/options so mobile clients display the right
- * copy without leaking unrelated audience rules.
- */
-export interface ResolvedOffer {
-  trialDays: number; // 0 when no trial
-  discountPercent: number; // 0 when no discount
-}
-
-export interface OfferContext {
-  /** True when the user has never had ANY paid subscription before. */
-  isFirstTime: boolean;
-  /** Detected ISO-3166-1 alpha-2 country code, uppercase. */
-  countryCode: string | null;
-  /** Reference time for starts_at / ends_at comparisons. */
-  now?: Date;
-}
-
-export function resolveOfferForTier(
-  tierOffers: TierOffers,
-  ctx: OfferContext,
-): ResolvedOffer {
-  const now = ctx.now ?? new Date();
-  const cc = (ctx.countryCode ?? "").toUpperCase();
-
-  // Trial -----------------------------------------------------------------
-  let trialDays = 0;
-  if (tierOffers.trial.enabled && tierOffers.trial.days > 0) {
-    if (
-      tierOffers.trial.audience === "everyone" ||
-      (tierOffers.trial.audience === "first_time" && ctx.isFirstTime)
-    ) {
-      trialDays = tierOffers.trial.days;
-    }
-  }
-
-  // Discount --------------------------------------------------------------
-  let discountPercent = 0;
-  const d = tierOffers.discount;
-  if (d.enabled && d.percentOff > 0) {
-    const startsAtOk = !d.startsAt || new Date(d.startsAt).getTime() <= now.getTime();
-    const endsAtOk = !d.endsAt || new Date(d.endsAt).getTime() >= now.getTime();
-    if (startsAtOk && endsAtOk) {
-      const audienceMatch =
-        d.audience === "everyone" ||
-        (d.audience === "first_time" && ctx.isFirstTime) ||
-        (d.audience === "by_country" && cc.length === 2 && cc === d.country.toUpperCase());
-      if (audienceMatch) discountPercent = d.percentOff;
-    }
-  }
-
-  return { trialDays, discountPercent };
 }

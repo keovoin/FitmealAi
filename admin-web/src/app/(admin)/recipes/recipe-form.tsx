@@ -9,7 +9,7 @@ import type {
   RecipeWriteInput,
   MealType,
   RecipeIngredient,
-} from "@/lib/supabase/recipes-queries";
+} from "@/lib/supabase/recipes-shared";
 import { Check, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
