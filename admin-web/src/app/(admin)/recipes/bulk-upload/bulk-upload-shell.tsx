@@ -16,6 +16,7 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 /**
@@ -322,9 +323,9 @@ function ResultPanel({
       {result.inserted > 0 && result.failed.length === 0 && (
         <p className="mt-2 text-[11px] text-white/65">
           Drafts are visible on{" "}
-          <a href="/recipes" className="text-accent-blue hover:underline">
+          <Link href="/recipes" className="text-accent-blue hover:underline">
             the recipes list
-          </a>
+          </Link>
           . Open each one to review and publish.
         </p>
       )}
