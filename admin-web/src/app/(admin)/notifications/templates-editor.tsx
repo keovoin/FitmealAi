@@ -75,9 +75,9 @@ export function NotificationTemplatesEditor({
                   {type}
                 </code>
                 {isCustomized && (
-                  <Badge tone="purple" data-testid={`template-customized-${type}`}>
-                    Custom
-                  </Badge>
+                  <span data-testid={`template-customized-${type}`}>
+                    <Badge tone="purple">Custom</Badge>
+                  </span>
                 )}
               </div>
               <button

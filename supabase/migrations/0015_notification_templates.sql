@@ -23,32 +23,34 @@
 insert into public.app_settings(key, value, description) values
   (
     'notification_templates',
-    jsonb_build_object(
-      'meal_plan_ready',   jsonb_build_object(
-        'title', 'Today''s plan is ready',
-        'body',  'Your personalized meal plan is waiting in FitMeal AI.'
-      ),
-      'payment_approved',  jsonb_build_object(
-        'title', 'Welcome to FitMeal {tier}',
-        'body',  'Your payment has been approved. Enjoy unlimited generations.'
-      ),
-      'water_reminder',    jsonb_build_object(
-        'title', 'Hydration check',
-        'body',  'Time to sip some water. Aim for 8 glasses a day.'
-      ),
-      'workout_reminder',  jsonb_build_object(
-        'title', 'Move your body',
-        'body',  'Your workout is scheduled. A short session beats none.'
-      ),
-      'habit_streak',      jsonb_build_object(
-        'title', '{streak}-day streak!',
-        'body',  'You''re on a roll, {name}. Keep it going.'
-      ),
-      'weekly_summary',    jsonb_build_object(
-        'title', 'Your weekly recap',
-        'body',  'Here''s how the past 7 days looked. Open the app for details.'
-      )
-    ),
+    $template$
+    {
+      "meal_plan_ready": {
+        "title": "Today is plan is ready",
+        "body":  "Your personalized meal plan is waiting in FitMeal AI."
+      },
+      "payment_approved": {
+        "title": "Welcome to FitMeal {tier}",
+        "body":  "Your payment has been approved. Enjoy unlimited generations."
+      },
+      "water_reminder": {
+        "title": "Hydration check",
+        "body":  "Time to sip some water. Aim for 8 glasses a day."
+      },
+      "workout_reminder": {
+        "title": "Move your body",
+        "body":  "Your workout is scheduled. A short session beats none."
+      },
+      "habit_streak": {
+        "title": "{streak}-day streak!",
+        "body":  "You are on a roll, {name}. Keep it going."
+      },
+      "weekly_summary": {
+        "title": "Your weekly recap",
+        "body":  "Here is how the past 7 days looked. Open the app for details."
+      }
+    }
+    $template$::jsonb,
     'Editable text for each push notification type. Surfaced on /notifications.'
   )
 on conflict (key) do nothing;
