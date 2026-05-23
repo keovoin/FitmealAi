@@ -97,7 +97,7 @@ export function AIProviderForm({
 
   const customReady =
     envStatus.custom.hasBaseUrl && envStatus.custom.hasApiKey;
-  const kiroReady = envStatus.kiro.hasBaseUrl && envStatus.kiro.hasApiKey;
+  const kiroReady = envStatus.kiro.hasApiKey;
   const openaiReady = envStatus.openai.hasApiKey;
   const draftIsValid =
     (draft.active === "openai" && openaiReady) ||
@@ -140,7 +140,7 @@ export function AIProviderForm({
       <ProviderCard
         id="kiro"
         title="Kiro AI gateway"
-        subtitle="Kiro's hosted OpenAI-compatible inference endpoint. Same wire format as OpenAI; separate slot so you can toggle between Kiro and a self-hosted endpoint without re-editing env vars."
+        subtitle="Kiro's hosted OpenAI-compatible inference endpoint. Gateway URL is built into the app — only the API key is required."
         active={draft.active === "kiro"}
         onSelect={() => pick("kiro")}
         onTest={() => runTest("kiro")}
@@ -149,12 +149,6 @@ export function AIProviderForm({
         canTest={kiroReady}
         icon={<Wand2 className="h-5 w-5" />}
       >
-        <EnvRow
-          icon={<Link2 className="h-3 w-3" />}
-          label="KIRO_AI_BASE_URL"
-          set={envStatus.kiro.hasBaseUrl}
-          hint="Kiro AI gateway base URL, root only — the OpenAI SDK appends /chat/completions etc."
-        />
         <EnvRow
           icon={<KeyRound className="h-3 w-3" />}
           label="KIRO_AI_API_KEY"
@@ -171,6 +165,12 @@ export function AIProviderForm({
           label="KIRO_AI_IMAGE_MODEL"
           set={envStatus.kiro.hasImageModel}
           hint="Optional. Leave blank if Kiro AI hasn't enabled image generation for your account — generation will gracefully skip."
+        />
+        <EnvRow
+          icon={<Link2 className="h-3 w-3" />}
+          label="KIRO_AI_BASE_URL"
+          set={envStatus.kiro.hasBaseUrlOverride}
+          hint="Optional override. Leave unset to use the default Kiro AI gateway URL baked into the app."
         />
       </ProviderCard>
 
@@ -271,7 +271,7 @@ function missingEnvHint(id: AIProviderId): string {
     return "Add CUSTOM_AI_BASE_URL + CUSTOM_AI_API_KEY on Vercel before activating Custom.";
   }
   if (id === "kiro") {
-    return "Add KIRO_AI_BASE_URL + KIRO_AI_API_KEY on Vercel before activating Kiro AI.";
+    return "Add KIRO_AI_API_KEY on Vercel before activating Kiro AI.";
   }
   return "Add OPENAI_API_KEY on Vercel before activating OpenAI.";
 }

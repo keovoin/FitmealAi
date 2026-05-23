@@ -11,11 +11,11 @@ import { getAIProviderSettings, type AIProviderId } from "@/lib/supabase/ai-prov
  *   - "custom" — any OpenAI-compatible endpoint (vLLM, Together,
  *                Anyscale, Ollama with the OpenAI compat layer, your
  *                own self-hosted build), configured via `CUSTOM_AI_*`
- *   - "kiro"   — the Kiro AI gateway (also OpenAI-compatible), kept
- *                as a separate slot so admins can have BOTH a
- *                self-hosted endpoint AND Kiro configured at once and
- *                flip between them without re-editing env vars.
- *                Configured via `KIRO_AI_*`.
+ *   - "kiro"   — the Kiro AI gateway (also OpenAI-compatible). The
+ *                gateway URL is fixed (see `KIRO_AI_DEFAULT_BASE_URL`
+ *                below) so admins only need to set `KIRO_AI_API_KEY`.
+ *                `KIRO_AI_BASE_URL` is accepted as an optional
+ *                override for staging/testing endpoints.
  *
  * The admin flips between them in /ai-settings without a redeploy. The
  * actual base URL + API key live in env vars on Vercel; the
@@ -25,6 +25,14 @@ import { getAIProviderSettings, type AIProviderId } from "@/lib/supabase/ai-prov
  * call `resolveActiveAIProvider()` once per request and re-use the
  * resolved client/model bundle for both the text and image legs.
  */
+
+/**
+ * Hard-coded Kiro AI gateway URL. Update here if Kiro publishes a
+ * different endpoint — admins should not need to set
+ * `KIRO_AI_BASE_URL` in normal operation. The URL is the root that
+ * the OpenAI SDK appends `/chat/completions` etc. to.
+ */
+const KIRO_AI_DEFAULT_BASE_URL = "https://api.kiro.dev/v1";
 
 export type { AIProviderId };
 
@@ -54,8 +62,8 @@ export interface ProviderEnvStatus {
     hasImageModel: boolean;
   };
   kiro: {
-    hasBaseUrl: boolean;
     hasApiKey: boolean;
+    hasBaseUrlOverride: boolean;
     hasTextModel: boolean;
     hasImageModel: boolean;
   };
@@ -122,8 +130,8 @@ export function getProviderEnvStatus(): ProviderEnvStatus {
       hasImageModel: !!process.env.CUSTOM_AI_IMAGE_MODEL?.trim(),
     },
     kiro: {
-      hasBaseUrl: !!process.env.KIRO_AI_BASE_URL?.trim(),
       hasApiKey: !!process.env.KIRO_AI_API_KEY?.trim(),
+      hasBaseUrlOverride: !!process.env.KIRO_AI_BASE_URL?.trim(),
       hasTextModel: !!process.env.KIRO_AI_TEXT_MODEL?.trim(),
       hasImageModel: !!process.env.KIRO_AI_IMAGE_MODEL?.trim(),
     },
@@ -191,26 +199,25 @@ function resolveCustomProvider(): ResolvedAIProvider {
 }
 
 function resolveKiroProvider(): ResolvedAIProvider {
-  // Same shape as the custom provider — Kiro AI exposes an
-  // OpenAI-compatible REST surface — but kept separate so admins can
-  // have Kiro AND a self-hosted endpoint configured at once and
-  // toggle between them in /ai-settings without re-editing env vars.
-  const baseURL = process.env.KIRO_AI_BASE_URL?.trim();
+  // Kiro AI exposes an OpenAI-compatible REST surface at a fixed
+  // gateway URL. Admins normally only need to set `KIRO_AI_API_KEY`;
+  // the base URL falls back to `KIRO_AI_DEFAULT_BASE_URL`. The
+  // optional `KIRO_AI_BASE_URL` env var lets us point at a staging
+  // gateway during testing without code changes.
   const apiKey = process.env.KIRO_AI_API_KEY?.trim();
-  const missing: string[] = [];
-  if (!baseURL) missing.push("KIRO_AI_BASE_URL");
-  if (!apiKey) missing.push("KIRO_AI_API_KEY");
-  if (missing.length > 0) {
+  if (!apiKey) {
     throw new AIProviderConfigError(
-      `Kiro AI is selected but ${missing.join(" and ")} ${missing.length === 1 ? "is" : "are"} not set on Vercel. Add the env var(s) and redeploy, or switch back to OpenAI in /ai-settings.`,
+      "Kiro AI is selected but KIRO_AI_API_KEY is not set on Vercel. Add the env var and redeploy, or switch back to OpenAI in /ai-settings.",
       "kiro",
     );
   }
+  const baseURL =
+    process.env.KIRO_AI_BASE_URL?.trim() || KIRO_AI_DEFAULT_BASE_URL;
   const textModel = process.env.KIRO_AI_TEXT_MODEL?.trim() || "default";
   const rawImage = process.env.KIRO_AI_IMAGE_MODEL?.trim();
   return {
     id: "kiro",
-    client: new OpenAI({ apiKey: apiKey!, baseURL: baseURL! }),
+    client: new OpenAI({ apiKey, baseURL }),
     textModel,
     imageModel: rawImage ? rawImage : null,
     supportsImages: !!rawImage,
@@ -229,10 +236,8 @@ function hasCustomEnv(): boolean {
 }
 
 function hasKiroEnv(): boolean {
-  return (
-    !!process.env.KIRO_AI_BASE_URL?.trim() &&
-    !!process.env.KIRO_AI_API_KEY?.trim()
-  );
+  // Kiro AI's base URL is hard-coded; the API key alone is enough.
+  return !!process.env.KIRO_AI_API_KEY?.trim();
 }
 
 // ---------------------------------------------------------------------------
