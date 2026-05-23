@@ -367,3 +367,81 @@ export async function getPendingPaymentsCount(): Promise<number> {
   if (error) throw new Error(`getPendingPaymentsCount: ${error.message}`);
   return count ?? 0;
 }
+
+
+// ---------------------------------------------------------------------------
+// Revenue / MRR History
+// ---------------------------------------------------------------------------
+
+export interface MrrDataPoint {
+  /** ISO date string (YYYY-MM-DD) for the week ending on this date */
+  weekEnding: string;
+  /** Label for display (e.g. "May 12") */
+  label: string;
+  /** MRR in dollars for that week snapshot */
+  mrr: number;
+  /** Count of active subscriptions at that point */
+  activeSubs: number;
+}
+
+/**
+ * Computes a weekly MRR history for the last N weeks by looking at
+ * subscription start/cancel dates. Each data point represents the
+ * MRR snapshot at the end of that week.
+ *
+ * This is an approximation — we count any subscription that was
+ * `started_at <= weekEnd` and either not canceled or `canceled_at > weekEnd`
+ * as active for that week.
+ */
+export async function getMrrHistory(weeks: number = 8): Promise<MrrDataPoint[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("subscriptions")
+    .select("monthly_price,started_at,canceled_at,status")
+    .order("started_at", { ascending: true });
+
+  if (error) throw new Error(`getMrrHistory: ${error.message}`);
+  const subs = data ?? [];
+
+  const points: MrrDataPoint[] = [];
+  const today = new Date();
+
+  for (let w = weeks - 1; w >= 0; w--) {
+    const weekEnd = new Date(today);
+    weekEnd.setDate(today.getDate() - w * 7);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const weekEndTs = weekEnd.getTime();
+    let mrr = 0;
+    let count = 0;
+
+    for (const sub of subs) {
+      const startedAt = new Date(sub.started_at as string).getTime();
+      if (startedAt > weekEndTs) continue; // not yet started
+
+      const canceledAt = sub.canceled_at
+        ? new Date(sub.canceled_at as string).getTime()
+        : null;
+      if (canceledAt && canceledAt <= weekEndTs) continue; // already canceled
+
+      const price = Number(
+        (sub.monthly_price as string).replace(/[^0-9.]/g, ""),
+      );
+      if (Number.isFinite(price)) {
+        mrr += price;
+        count++;
+      }
+    }
+
+    const month = weekEnd.toLocaleString("en-US", { month: "short" });
+    const day = weekEnd.getDate();
+    points.push({
+      weekEnding: weekEnd.toISOString().slice(0, 10),
+      label: `${month} ${day}`,
+      mrr: Math.round(mrr * 100) / 100,
+      activeSubs: count,
+    });
+  }
+
+  return points;
+}

@@ -15,10 +15,18 @@ struct FitMealAIApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
-                .preferredColorScheme(.dark) // v1: dark glass UI only
+                .preferredColorScheme(resolvedColorScheme)
                 .onOpenURL { url in
                     _ = GoogleSignInService(config: appState.config).handleOpenURL(url)
                 }
+        }
+    }
+
+    private var resolvedColorScheme: ColorScheme? {
+        switch appState.preferencesStore.colorScheme {
+        case .system: return nil   // follow device setting
+        case .dark:   return .dark
+        case .light:  return .light
         }
     }
 }

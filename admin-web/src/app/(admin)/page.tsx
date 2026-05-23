@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   getDashboardSnapshotFromDb,
+  getMrrHistory,
   listPayments,
 } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
@@ -17,6 +18,7 @@ import { relativeFromNow } from "@/lib/format";
 import { AlertTriangle, ArrowRight, CreditCard, TrendingUp, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { SignupsChart } from "./signups-chart";
+import { RevenueChart } from "./revenue-chart";
 import { DashboardRegenerateTool } from "./dashboard-regenerate-tool";
 
 // Always render fresh; never cache the dashboard since it shows live counters.
@@ -49,9 +51,10 @@ export default async function DashboardPage() {
   let recentPayments: Awaited<ReturnType<typeof listPayments>> = [];
 
   try {
-    const [snapshotRes, allPayments] = await Promise.all([
+    const [snapshotRes, allPayments, mrrHistory] = await Promise.all([
       getDashboardSnapshotFromDb(),
       listPayments(),
+      getMrrHistory(8),
     ]);
     snapshot = snapshotRes;
     recentPayments = allPayments
@@ -209,6 +212,27 @@ export default async function DashboardPage() {
                 </div>
               );
             })}
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* Revenue / MRR history */}
+      <div className="mt-4">
+        <GlassCard>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-white/50">Revenue</p>
+              <p className="text-base font-semibold text-white">MRR over time</p>
+            </div>
+            <Link
+              href="/subscriptions"
+              className="text-xs text-accent-blue hover:underline"
+            >
+              View subscriptions
+            </Link>
+          </div>
+          <div className="mt-4">
+            <RevenueChart data={mrrHistory} />
           </div>
         </GlassCard>
       </div>
