@@ -279,3 +279,123 @@ export async function setReferralStatus(
   revalidatePath("/referrals");
   return { ok: true };
 }
+
+
+
+// ===========================================================================
+// Phase 5: quota settings, pricing offers, recipes catalog
+// ===========================================================================
+
+import {
+  setQuotaSettings,
+  type QuotaSettings,
+} from "./quota-settings";
+import {
+  setPricingOffers,
+  type PricingOffers,
+} from "./pricing-offers";
+import {
+  setRecipeStatus,
+  updateRecipe,
+  upsertRecipe,
+  type RecipeWriteInput,
+  type RecipeStatus,
+} from "./recipes-queries";
+
+/**
+ * Persist the per-tier daily quotas (Free/Silver/Gold AI + shuffles).
+ * `check_ai_rate_limit()` reads these on every AI call, so the change
+ * is effective immediately for every mobile client.
+ */
+export async function updateQuotaSettings(
+  next: QuotaSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setQuotaSettings(next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/quotas");
+  revalidatePath("/setup");
+  return { ok: true };
+}
+
+/**
+ * Persist the trial + first-payment-discount config for both paid
+ * tiers. Mobile clients pick up the new offer text on their next
+ * /api/payments/options poll (typically when the paywall opens).
+ */
+export async function updatePricingOffers(
+  next: PricingOffers,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setPricingOffers(next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/payment-settings");
+  return { ok: true };
+}
+
+/** Create a new recipe (admin-side; defaults to draft). */
+export async function createRecipe(
+  input: RecipeWriteInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    const recipe = await upsertRecipe(input);
+    revalidatePath("/recipes");
+    revalidatePath(`/recipes/${recipe.id}`);
+    return { ok: true, id: recipe.id };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+}
+
+/** Edit an existing recipe in place. */
+export async function saveRecipe(
+  id: string,
+  patch: Partial<RecipeWriteInput>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await updateRecipe(id, patch);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/recipes");
+  revalidatePath(`/recipes/${id}`);
+  return { ok: true };
+}
+
+/**
+ * Flip a recipe's status. `published` records `approved_at` so we know
+ * when it became visible to mobile clients. Used by the per-row
+ * Publish / Archive / Restore buttons.
+ */
+export async function transitionRecipe(
+  id: string,
+  next: RecipeStatus,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setRecipeStatus(id, next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/recipes");
+  revalidatePath(`/recipes/${id}`);
+  return { ok: true };
+}
