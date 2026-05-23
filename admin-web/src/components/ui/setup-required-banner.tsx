@@ -1,6 +1,8 @@
 import { AlertTriangle, Database } from "lucide-react";
 import Link from "next/link";
 
+import { LATEST_MIGRATION_NUMBER } from "@/lib/supabase/setup-check";
+
 /**
  * Shown on every admin page when a query failed because the Supabase
  * tables haven't been created yet. Replaces the generic Next.js
@@ -59,7 +61,7 @@ export function SetupRequiredBanner({
               </code>{" "}
               through{" "}
               <code className="rounded bg-white/10 px-1 py-0.5 text-[11px]">
-                0013_*.sql
+                {String(LATEST_MIGRATION_NUMBER).padStart(4, "0")}_*.sql
               </code>{" "}
               and run them in order.
             </li>

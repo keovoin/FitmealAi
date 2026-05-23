@@ -12,7 +12,16 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
  * arrive without the SQLSTATE.
  */
 
+// IMPORTANT: when you add a migration that introduces a new table,
+// (a) add the table name to REQUIRED_TABLES below so /setup health
+//     check probes it,
+// (b) bump LATEST_MIGRATION_NUMBER so the SetupRequiredBanner tells
+//     users to run the new migration.
+//
+// Both are read by `<SetupRequiredBanner>` and `/setup`, the two
+// places admins land on when something goes wrong.
 const REQUIRED_TABLES = [
+  // 0001-0011 baseline
   "profiles",
   "user_goals",
   "meal_prefs",
@@ -28,7 +37,24 @@ const REQUIRED_TABLES = [
   "payment_requests",
   "ai_generations",
   "app_settings",
+  // 0014_push_tokens_and_referrals
+  "push_tokens",
+  "notification_prefs",
+  "referral_codes",
+  "referrals",
+  // 0016_quotas_and_recipes
+  "recipes",
+  "user_daily_quotas",
 ] as const;
+
+/**
+ * Highest-numbered migration in `supabase/migrations/`. Surfaced in the
+ * SetupRequiredBanner copy so admins know how many files to paste into
+ * the SQL editor.
+ *
+ * Update this whenever you add a new `NNNN_*.sql` migration.
+ */
+export const LATEST_MIGRATION_NUMBER = 16;
 
 export type RequiredTable = (typeof REQUIRED_TABLES)[number];
 
