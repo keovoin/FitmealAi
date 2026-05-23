@@ -9,6 +9,10 @@ import {
   setNotificationTemplates,
   type NotificationTemplates,
 } from "./notification-templates";
+import {
+  setTelegramSettings,
+  type TelegramSettings,
+} from "./telegram-settings";
 
 /**
  * Mark a pending payment as approved or rejected. The DB trigger
@@ -277,5 +281,29 @@ export async function setReferralStatus(
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/referrals");
+  return { ok: true };
+}
+
+
+
+/**
+ * Persist the Telegram bot toggle + username. The mobile client reads
+ * the resolved values via the admin's `/api/mobile-config` endpoint
+ * (or, for current builds, from `FITMEAL_TELEGRAM_BOT_USERNAME` baked
+ * into BuildConfig). The change is effective immediately for any
+ * server-side render that loads the row.
+ */
+export async function updateTelegramSettings(
+  next: TelegramSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setTelegramSettings(next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/notifications");
   return { ok: true };
 }

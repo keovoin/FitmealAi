@@ -5,7 +5,9 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getNotificationTemplates } from "@/lib/supabase/notification-templates";
+import { getTelegramSettings } from "@/lib/supabase/telegram-settings";
 import { NotificationTemplatesEditor } from "./templates-editor";
+import { TelegramSettingsPanel } from "./telegram-settings-panel";
 import {
   Bell,
   Check,
@@ -35,7 +37,7 @@ export default async function NotificationsAdminPage() {
   const apnsKeyId = !!process.env.APNS_KEY_ID;
   const apnsTeamId = !!process.env.APNS_TEAM_ID;
   const apnsP8 = !!process.env.APNS_KEY_P8;
-  const telegramOk = !!process.env.TELEGRAM_BOT_TOKEN;
+  const telegramTokenOk = !!process.env.TELEGRAM_BOT_TOKEN;
 
   const providers: ProviderStatus[] = [
     {
@@ -88,7 +90,7 @@ export default async function NotificationsAdminPage() {
     {
       name: "Telegram bot token",
       envVar: "TELEGRAM_BOT_TOKEN",
-      ok: telegramOk,
+      ok: telegramTokenOk,
       description:
         "Bot token issued by @BotFather. Used by /api/telegram/send and the webhook.",
       doc: {
@@ -109,7 +111,10 @@ export default async function NotificationsAdminPage() {
     );
   }
 
-  const templates = await getNotificationTemplates();
+  const [templates, telegram] = await Promise.all([
+    getNotificationTemplates(),
+    getTelegramSettings(),
+  ]);
 
   return (
     <PageShell
@@ -183,6 +188,44 @@ export default async function NotificationsAdminPage() {
           ))}
         </ul>
       </GlassCard>
+
+      {/* Telegram admin controls ----------------------------------------- */}
+      <div className="mt-3">
+        <GlassCard data-testid="telegram-settings-card">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-white/50">
+                Telegram bot
+              </p>
+              <p className="mt-1 text-base font-semibold text-white">
+                Account linking via @BotFather bot
+              </p>
+              <p className="mt-1 text-sm text-white/60">
+                Users tap{" "}
+                <span className="font-medium text-white/75">
+                  Settings &rarr; Notifications &rarr; Link Telegram
+                </span>{" "}
+                in the mobile app to mirror their notifications to a
+                Telegram chat. Toggle this off to hide that button while
+                you finish bot setup.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <DocLink href="https://t.me/BotFather" label="@BotFather" />
+                <DocLink
+                  href="https://core.telegram.org/bots/api#setwebhook"
+                  label="setWebhook reference"
+                />
+              </div>
+            </div>
+            <MessageCircle className="h-6 w-6 flex-shrink-0 text-accent-blue" />
+          </div>
+
+          <TelegramSettingsPanel
+            initial={telegram}
+            tokenConfigured={telegramTokenOk}
+          />
+        </GlassCard>
+      </div>
 
       {/* Template editor -------------------------------------------------- */}
       <div className="mt-3">
