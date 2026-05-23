@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel previous runs of the same workflow on a branch when new commits land.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Admin web (Next.js) — typecheck + lint + build.
+  # ---------------------------------------------------------------------------
+  admin-web:
+    name: admin-web (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint --if-present
+      - name: Build
+        env:
+          # Build-time defaults so `next build` doesn't fail on missing
+          # NEXT_PUBLIC_* values. Real values are configured in Vercel.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-key
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # iOS — Swift syntax parse for every .swift file (no Xcode needed).
+  # ---------------------------------------------------------------------------
+  ios-swift-parse:
+    name: iOS swift-parse
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse all Swift files
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in $(find FitMealAI -name "*.swift"); do
+            if ! swift -frontend -parse "$f" 2>/tmp/err; then
+              echo "::error file=$f::Swift parse failed"
+              cat /tmp/err
+              fail=1
+            elif [ -s /tmp/err ]; then
+              echo "::warning file=$f::Swift parse emitted warnings"
+              cat /tmp/err
+            fi
+          done
+          exit $fail
+
+  # ---------------------------------------------------------------------------
+  # Android — Gradle assembleDebug. Caches the Android SDK + Gradle.
+  # ---------------------------------------------------------------------------
+  android-build:
+    name: Android assembleDebug
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          api-level: 35
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Make wrapper executable
+        run: chmod +x ./gradlew
+      - name: Assemble debug APK
+        env:
+          # Optional config values are empty by default so the build
+          # doesn't fail on missing secrets. Real values come from
+          # repository secrets in production releases.
+          FITMEAL_SUPABASE_URL: ""
+          FITMEAL_SUPABASE_ANON_KEY: ""
+          FITMEAL_API_BASE_URL: ""
+          FITMEAL_GOOGLE_ANDROID_CLIENT_ID: ""
+          FITMEAL_GOOGLE_WEB_CLIENT_ID: ""
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitmeal-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # SQL migrations — sanity-check that every file is valid SQL by passing
+  # it through pg-query-emscripten (no actual DB needed).
+  # ---------------------------------------------------------------------------
+  sql-lint:
+    name: SQL migrations syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pg-query-emscripten
+        run: npm install -g pg-query-emscripten@5
+      - name: Parse migrations
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in supabase/migrations/*.sql; do
+            node -e "
+              const pg = require('pg-query-emscripten');
+              pg.default().then((q) => {
+                const sql = require('fs').readFileSync(process.argv[1], 'utf8');
+                const r = q.parse(sql);
+                if (r.error) { console.error('FAIL ' + process.argv[1] + ':', r.error); process.exit(1); }
+                console.log('OK   ' + process.argv[1]);
+              });
+            " "$f" || fail=1
+          done
+          exit $fail

@@ -108,9 +108,9 @@ export default function AdminError({
                 <code className="rounded bg-white/10 px-1 py-0.5 text-xs">
                   supabase/migrations/
                 </code>{" "}
-                from <code>0001</code> through <code>0011</code> in order.
+                from <code>0001</code> through <code>0013</code> in order.
               </li>
-              <li>Click "Try again" above.</li>
+              <li>Click &ldquo;Try again&rdquo; above.</li>
             </ol>
           </GlassCard>
         )}

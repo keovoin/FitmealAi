@@ -24,6 +24,7 @@ final class PreferencesStore: ObservableObject {
 
     @Published var workout: WorkoutPrefs
     @Published var meal: MealPrefs
+    @Published var colorScheme: AppColorScheme
 
     // MARK: - Init
 
@@ -32,6 +33,9 @@ final class PreferencesStore: ObservableObject {
         let loaded = Self.load(from: defaults)
         self.workout = loaded.workout
         self.meal = loaded.meal
+        self.colorScheme = AppColorScheme(
+            rawValue: defaults.string(forKey: "fitmeal_color_scheme") ?? "system"
+        ) ?? .system
     }
 
     // MARK: - Public API (matches React preferences.ts)
@@ -44,6 +48,11 @@ final class PreferencesStore: ObservableObject {
     func saveMealPrefs(_ prefs: MealPrefs) {
         meal = prefs
         persist()
+    }
+
+    func setColorScheme(_ scheme: AppColorScheme) {
+        colorScheme = scheme
+        defaults.set(scheme.rawValue, forKey: "fitmeal_color_scheme")
     }
 
     // MARK: - Internals
@@ -67,6 +76,24 @@ final class PreferencesStore: ObservableObject {
         let snapshot = Snapshot(workout: workout, meal: meal)
         if let data = try? JSONEncoder().encode(snapshot) {
             defaults.set(data, forKey: Self.key)
+        }
+    }
+}
+
+
+
+// MARK: - Color Scheme
+
+enum AppColorScheme: String, CaseIterable, Codable {
+    case system
+    case dark
+    case light
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .dark:   return "Dark"
+        case .light:  return "Light"
         }
     }
 }

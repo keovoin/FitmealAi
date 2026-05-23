@@ -12,6 +12,11 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Manual ABA payment flow is hidden from the sidebar for now: the user
+// is going global and Apple / Google in-app purchase will be the only
+// supported subscription path. The /payment-settings route still works
+// (and the /payments review queue stays visible) — just not surfaced
+// in primary nav. To re-enable, add the entry back here.
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/payments", label: "Payments", icon: Wallet, badgeKey: "pendingPayments" as const },

@@ -56,6 +56,15 @@ struct PaywallView: View {
             secondaryActions
             footer
         }
+        .task {
+            // Loads StoreKit 2 products + their localized prices the first
+            // time the paywall opens. No-op when SubscriptionManager isn't
+            // wired (preview).
+            await vm.loadProducts()
+            // Resolve the per-user payment availability so we know whether
+            // to show the manual ABA button (Cambodia-only by default).
+            await vm.refreshPaymentOptions()
+        }
     }
 
     // MARK: - Sections
@@ -184,8 +193,13 @@ struct PaywallView: View {
             SecondaryGlassButton(title: "Restore Purchase", icon: "arrow.clockwise") {
                 Task { await vm.restore() }
             }
-            SecondaryGlassButton(title: "Pay with ABA (manual)", icon: "qrcode") {
-                onABAPaymentTapped?()
+            // "Pay with ABA (manual)" is geo-locked: the admin toggle in
+            // /payment-settings can disable it entirely, and the country
+            // allow-list (default: Cambodia only) hides it everywhere else.
+            if vm.isAbaPaymentAvailable {
+                SecondaryGlassButton(title: "Pay with ABA (manual)", icon: "qrcode") {
+                    onABAPaymentTapped?()
+                }
             }
         }
     }

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +43,12 @@ import com.fitmealai.ui.theme.FitMealSpacing
 @Composable
 fun PaywallScreen(state: AppState, onClose: () -> Unit) {
     var selectedTier by remember { mutableStateOf(SubscriptionTier.Gold) }
+    val paymentOptions by state.paymentOptions.collectAsState()
+
+    // Refresh per-user payment availability the first time the paywall
+    // sheet opens. The endpoint is uncached so the toggle in
+    // /payment-settings flips live without app restart.
+    LaunchedEffect(Unit) { state.refreshPaymentOptions() }
 
     ScreenContainer(modifier = Modifier.testTag("android-paywall-screen")) {
         TopBar(title = "Upgrade", subtitle = "Unlock unlimited AI plans", onBack = onClose)
@@ -59,28 +67,53 @@ fun PaywallScreen(state: AppState, onClose: () -> Unit) {
             SubscriptionTier.Gold -> "Subscribe to Gold"
         }
 
+        val context = androidx.compose.ui.platform.LocalContext.current
+
         PrimaryGradientButton(
             title = cta,
             tag = "android-paywall-purchase-button",
         ) {
-            // Phase A4: in production this triggers BillingHelper.launchPurchase().
-            // For now, locally upgrade the tier so the rest of the app reflects the change.
-            state.upgradeTier(selectedTier)
-            onClose()
+            if (selectedTier == SubscriptionTier.Free) {
+                onClose()
+            } else {
+                val activity = context.findActivity()
+                if (activity == null) {
+                    state.setToast("Could not find host activity for billing flow.")
+                } else {
+                    // Real Google Play Billing flow. The PaywallScreen sheet
+                    // stays mounted; AppState collects the BillingEvent and
+                    // dismisses the sheet on success.
+                    state.purchaseTier(activity, selectedTier)
+                }
+            }
         }
 
-        SecondaryGlassButton(
-            title = "Pay manually via ABA",
-            tag = "android-paywall-aba-button",
-        ) { state.showSheet(AppSheet.AbaPayment) }
+        // "Pay manually via ABA" is geo-locked: the admin toggle in
+        // /payment-settings can disable it entirely, and the country
+        // allow-list (default: Cambodia only) hides it everywhere else.
+        if (paymentOptions.abaAvailableForUser) {
+            SecondaryGlassButton(
+                title = "Pay manually via ABA",
+                tag = "android-paywall-aba-button",
+            ) { state.showSheet(AppSheet.AbaPayment) }
+        }
 
         SecondaryGlassButton(
             title = "Restore purchases",
             tag = "android-paywall-restore-button",
-        ) { state.setToast("Restore purchases will hit Play Billing once products are configured.") }
+        ) { state.restorePurchases() }
 
         Spacer(Modifier.height(FitMealSpacing.large))
     }
+}
+
+private fun android.content.Context.findActivity(): android.app.Activity? {
+    var ctx: android.content.Context? = this
+    while (ctx != null) {
+        if (ctx is android.app.Activity) return ctx
+        ctx = (ctx as? android.content.ContextWrapper)?.baseContext
+    }
+    return null
 }
 
 @Composable

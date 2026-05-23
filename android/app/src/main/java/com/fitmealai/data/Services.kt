@@ -41,6 +41,28 @@ data class PaymentRequestResult(
     val status: String,
 )
 
+/**
+ * Server response from POST /api/payments/create-khqr. Mobile clients
+ * decode the [qrPayload] into a QR with their preferred renderer, or
+ * fall back to fetching [qrImageUrl].
+ */
+data class KhqrSession(
+    val paymentRequestId: String,
+    val providerId: String,
+    val providerSessionId: String,
+    val qrPayload: String?,
+    val qrImageUrl: String?,
+    val deepLink: String?,
+    val checkoutUrl: String?,
+    val expiresAtIso: String,
+)
+
+data class PaymentStatusSnapshot(
+    val paymentRequestId: String,
+    val status: String,
+    val providerId: String,
+)
+
 class AuthException(message: String) : Exception(message)
 
 // ---------------------------------------------------------------------------
@@ -224,12 +246,51 @@ class AIRepository(private val config: AppConfig = AppConfig()) {
 
 class PaymentRepository(private val config: AppConfig = AppConfig()) {
 
+    /**
+     * Uploads PNG/JPEG receipt bytes to Supabase Storage `receipts` bucket
+     * and returns the storage path. Mirrors the iOS [ReceiptUploadService].
+     * The path format is `{userId}/{uuid}.{ext}`.
+     */
+    suspend fun uploadReceipt(
+        session: AuthSession,
+        bytes: ByteArray,
+        contentType: String,
+    ): String {
+        config.requireSupabase()
+        val ext = if (contentType.contains("png", ignoreCase = true)) "png" else "jpg"
+        val key = "${session.userId}/${java.util.UUID.randomUUID()}.$ext"
+        val url = "${config.supabaseUrl.trimEnd('/')}/storage/v1/object/receipts/$key"
+
+        return withContext(Dispatchers.IO) {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 15_000
+                readTimeout = 60_000
+                doOutput = true
+                setRequestProperty("apikey", config.supabaseAnonKey)
+                setRequestProperty("Authorization", "Bearer ${session.accessToken}")
+                setRequestProperty("Content-Type", contentType)
+                setRequestProperty("Cache-Control", "3600")
+            }
+            connection.outputStream.use { it.write(bytes) }
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                val errBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                throw AuthException("Receipt upload failed ($code): ${errBody.take(200)}")
+            }
+            // Drain to release connection.
+            connection.inputStream?.close()
+            key
+        }
+    }
+
     suspend fun submitAbaPayment(
         session: AuthSession,
         tier: String,
         amount: String,
         transactionId: String,
         receiptStoragePath: String? = null,
+        provider: String = "manual_aba",
     ): PaymentRequestResult {
         config.requireSupabase()
         val response = postJson(
@@ -240,6 +301,8 @@ class PaymentRepository(private val config: AppConfig = AppConfig()) {
                 .put("amount", amount)
                 .put("transaction_id", transactionId)
                 .put("status", "pending")
+                .put("provider", provider)
+                .put("currency", "USD")
                 .put("submitted_at", OffsetDateTime.now().toString())
                 .let { obj ->
                     if (receiptStoragePath != null) obj.put("receipt_storage_path", receiptStoragePath)
@@ -261,11 +324,87 @@ class PaymentRepository(private val config: AppConfig = AppConfig()) {
             status = first.optString("status", "pending"),
         )
     }
+
+    /**
+     * Creates a KHQR session via the admin-web `/api/payments/create-khqr`
+     * endpoint. The route picks the configured provider (Bakong / PayWay /
+     * CamRapidPay) and returns a QR payload + session id.
+     */
+    suspend fun createKhqrSession(
+        session: AuthSession,
+        tier: String,
+        provider: String? = null,
+        description: String? = null,
+    ): KhqrSession {
+        config.requireApi()
+        val body = JSONObject()
+            .put("user_id", session.userId)
+            .put("tier", tier)
+        if (provider != null) body.put("provider", provider)
+        if (description != null) body.put("description", description)
+        val response = postJson(
+            url = "${config.apiBaseUrl.trimEnd('/')}/api/payments/create-khqr",
+            body = body,
+            headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+        )
+        return KhqrSession(
+            paymentRequestId = response.optString("paymentRequestId"),
+            providerId = response.optString("providerId"),
+            providerSessionId = response.optString("providerSessionId"),
+            qrPayload = response.optString("qrPayload").ifBlank { null },
+            qrImageUrl = response.optString("qrImageUrl").ifBlank { null },
+            deepLink = response.optString("deepLink").ifBlank { null },
+            checkoutUrl = response.optString("checkoutUrl").ifBlank { null },
+            expiresAtIso = response.optString("expiresAt"),
+        )
+    }
+
+    /** Polls /api/payments/status/{id} for the latest gateway-side status. */
+    suspend fun checkKhqrStatus(
+        session: AuthSession,
+        paymentRequestId: String,
+    ): PaymentStatusSnapshot {
+        config.requireApi()
+        val url = "${config.apiBaseUrl.trimEnd('/')}/api/payments/status/$paymentRequestId"
+        val response = getJson(
+            url = url,
+            headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+        )
+        return PaymentStatusSnapshot(
+            paymentRequestId = response.optString("paymentRequestId"),
+            status = response.optString("status", "pending"),
+            providerId = response.optString("providerId"),
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
 // HTTP helper (uses HttpURLConnection so we don't pull OkHttp into the APK).
 // ---------------------------------------------------------------------------
+
+private suspend fun getJson(
+    url: String,
+    headers: Map<String, String>,
+): JSONObject = withContext(Dispatchers.IO) {
+    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 15_000
+        readTimeout = 30_000
+        setRequestProperty("Accept", "application/json")
+        headers.forEach { (key, value) -> setRequestProperty(key, value) }
+    }
+    val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+    val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
+    if (connection.responseCode !in 200..299) {
+        val err = runCatching { JSONObject(text.ifBlank { "{}" }) }.getOrDefault(JSONObject())
+        val message = err.optString("error_description").ifBlank {
+            err.optString("message").ifBlank { "Request failed with ${connection.responseCode}" }
+        }
+        throw AuthException(message)
+    }
+    if (text.trim().startsWith("[")) JSONObject().put("data", JSONArray(text))
+    else JSONObject(text.ifBlank { "{}" })
+}
 
 private suspend fun postJson(
     url: String,

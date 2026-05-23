@@ -3,10 +3,10 @@
 //  FitMealAI
 //
 //  Owns the paywall plan list and the user's current selection.
-//  StoreKit 2 / restore / ABA actions are stubbed - Phase 3 will wire
-//  them through SubscriptionManager + PaymentService.
-//
-//  No SwiftUI imports.
+//  Wires through SubscriptionManager for real StoreKit 2 purchase
+//  + restore. Calls PaymentOptionsService to find out which payment
+//  methods (ABA / KHQR) are available for the current user before
+//  rendering the secondary actions.
 //
 
 import Foundation
@@ -19,14 +19,23 @@ final class PaywallViewModel: ObservableObject {
     @Published var selectedTier: SubscriptionTier
     @Published private(set) var isPurchasing: Bool = false
     @Published private(set) var isRestoring: Bool = false
+    @Published private(set) var isLoadingProducts: Bool = false
     @Published var errorMessage: String? = nil
+    @Published private(set) var paymentOptions: PaymentOptions = .unavailable
+
+    private let subscriptionManager: SubscriptionManager?
+    private let paymentOptionsService: PaymentOptionsService?
 
     init(
         plans: [SubscriptionPlan] = MockData.plans,
-        defaultSelection: SubscriptionTier = .gold
+        defaultSelection: SubscriptionTier = .gold,
+        subscriptionManager: SubscriptionManager? = nil,
+        paymentOptionsService: PaymentOptionsService? = nil
     ) {
         self.plans = plans
         self.selectedTier = defaultSelection
+        self.subscriptionManager = subscriptionManager
+        self.paymentOptionsService = paymentOptionsService
     }
 
     // MARK: - Derived
@@ -44,6 +53,15 @@ final class PaywallViewModel: ObservableObject {
         }
     }
 
+    /// Whether to show the "Pay with ABA (manual)" secondary button.
+    /// Now defaults to false until the admin explicitly re-enables ABA
+    /// in /payment-settings (the manual flow is hidden product-wide
+    /// while the app expands beyond Cambodia).
+    var isAbaAvailable: Bool {
+        guard paymentOptionsService != nil else { return false }
+        return paymentOptions.aba_payment.available_for_user
+    }
+
     // MARK: - Intents
 
     func select(_ tier: SubscriptionTier) {
@@ -51,21 +69,69 @@ final class PaywallViewModel: ObservableObject {
         errorMessage = nil
     }
 
-    /// Stub for StoreKit 2 purchase. Phase-3 will replace this with
-    /// SubscriptionManager.purchase(productId:).
-    func purchase() async -> Bool {
-        guard !isPurchasing else { return false }
-        isPurchasing = true
-        defer { isPurchasing = false }
-        try? await Task.sleep(nanoseconds: 700_000_000)
-        return true
+    /// Loads StoreKit products and prices. Safe to call multiple times.
+    func loadProducts() async {
+        guard let manager = subscriptionManager else { return }
+        isLoadingProducts = true
+        defer { isLoadingProducts = false }
+        await manager.loadProducts()
+        if let err = manager.loadError {
+            errorMessage = err
+        }
     }
 
-    /// Stub for restoring previous purchases.
+    /// Refreshes the per-user payment availability flags. Safe to call
+    /// multiple times; the server endpoint is uncached.
+    func refreshPaymentOptions() async {
+        guard let service = paymentOptionsService else { return }
+        let next = await service.fetch()
+        paymentOptions = next
+    }
+
+    /// Initiates the StoreKit 2 purchase flow. Returns true on success.
+    /// Falls back to a 700ms simulated success when no SubscriptionManager
+    /// is wired in (preview previews / unit tests).
+    func purchase() async -> Bool {
+        guard !isPurchasing else { return false }
+        guard let manager = subscriptionManager else {
+            // Preview path
+            isPurchasing = true
+            defer { isPurchasing = false }
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            return true
+        }
+        isPurchasing = true
+        defer { isPurchasing = false }
+        errorMessage = nil
+        do {
+            _ = try await manager.purchase(selectedTier)
+            return true
+        } catch SubscriptionManager.PurchaseError.userCancelled {
+            // Don't surface a noisy error if the user just bailed.
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Restores any previously-bought subscription via StoreKit 2.
     func restore() async {
         guard !isRestoring else { return }
+        guard let manager = subscriptionManager else {
+            // Preview path
+            isRestoring = true
+            defer { isRestoring = false }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            return
+        }
         isRestoring = true
         defer { isRestoring = false }
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        errorMessage = nil
+        do {
+            try await manager.restore()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
