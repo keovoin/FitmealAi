@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { user_id, title, body, data } = parsed.data;
+  // `body` and `data` will be passed to FCM/APNs once those clients are
+  // wired up. We accept and validate them now so the contract is stable.
+  void body;
+  void data;
   const sb = getSupabaseAdmin();
 
   // Get user's push tokens

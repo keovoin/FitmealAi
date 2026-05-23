@@ -5,6 +5,10 @@ import { isAIConfigured } from "@/lib/ai/openai";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
 import { setAbaPaymentSettings, type AbaPaymentSettings } from "./app-settings";
+import {
+  setNotificationTemplates,
+  type NotificationTemplates,
+} from "./notification-templates";
 
 /**
  * Mark a pending payment as approved or rejected. The DB trigger
@@ -224,5 +228,54 @@ export async function updateAbaPaymentSettings(
   revalidatePath("/payment-settings");
   revalidatePath("/settings");
   revalidatePath("/setup");
+  return { ok: true };
+}
+
+
+
+/**
+ * Persist edited notification templates. Effective immediately for any
+ * server-side render of /api/push/send and /api/telegram/send because
+ * those routes load the row on each call.
+ */
+export async function updateNotificationTemplates(
+  next: NotificationTemplates,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setNotificationTemplates(next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/notifications");
+  return { ok: true };
+}
+
+/**
+ * Admin override: flip a referral's status. The DB trigger on `referrals`
+ * fires only when status transitions into 'verified' from something else,
+ * so manually verifying here also kicks off the auto-Gold reward at 3.
+ */
+export async function setReferralStatus(
+  referralId: string,
+  next: "verified" | "rejected",
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  const sb = getSupabaseAdmin();
+  const update: Record<string, unknown> = { status: next };
+  if (next === "verified") {
+    update.verified_at = new Date().toISOString();
+  }
+  const { error } = await sb
+    .from("referrals")
+    .update(update)
+    .eq("id", referralId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/referrals");
   return { ok: true };
 }

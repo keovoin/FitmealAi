@@ -35,7 +35,10 @@ import com.fitmealai.ui.screens.payment.PaymentPendingScreen
 import com.fitmealai.ui.screens.paywall.PaywallScreen
 import com.fitmealai.ui.screens.progress.ProgressScreen
 import com.fitmealai.ui.screens.settings.SettingsMealSheet
+import com.fitmealai.ui.screens.settings.SettingsNotificationsSheet
+import com.fitmealai.ui.screens.settings.SettingsReferralSheet
 import com.fitmealai.ui.screens.settings.SettingsScreen
+import com.fitmealai.ui.screens.settings.SettingsThemeSheet
 import com.fitmealai.ui.screens.settings.SettingsWorkoutSheet
 import com.fitmealai.ui.screens.workout.WorkoutScreen
 import com.fitmealai.ui.theme.FitMealBrushes
@@ -116,6 +119,18 @@ fun MainShell(state: AppState) {
                 )
                 AppSheet.MealSettings -> SettingsMealSheet(
                     store = state.preferencesStore,
+                    onDone = { state.showSheet(null) },
+                )
+                AppSheet.NotificationSettings -> SettingsNotificationsSheet(
+                    state = state,
+                    onDone = { state.showSheet(null) },
+                )
+                AppSheet.Referrals -> SettingsReferralSheet(
+                    state = state,
+                    onDone = { state.showSheet(null) },
+                )
+                AppSheet.ThemePicker -> SettingsThemeSheet(
+                    state = state,
                     onDone = { state.showSheet(null) },
                 )
                 null -> Unit

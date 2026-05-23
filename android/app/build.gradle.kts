@@ -4,6 +4,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Apply Google Services (FCM) only when a real google-services.json
+// is present in app/. Lets `./gradlew :app:assembleDebug` succeed for
+// contributors who haven't downloaded the Firebase config yet, while
+// still wiring Firebase normally for full release builds.
+val hasGoogleServices = file("google-services.json").exists()
+if (hasGoogleServices) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.fitmealai"
     compileSdk = 35
@@ -27,6 +36,7 @@ android {
         buildConfigField("String", "FITMEAL_API_BASE_URL", "\"${configValue("FITMEAL_API_BASE_URL")}\"")
         buildConfigField("String", "FITMEAL_GOOGLE_ANDROID_CLIENT_ID", "\"${configValue("FITMEAL_GOOGLE_ANDROID_CLIENT_ID")}\"")
         buildConfigField("String", "FITMEAL_GOOGLE_WEB_CLIENT_ID", "\"${configValue("FITMEAL_GOOGLE_WEB_CLIENT_ID")}\"")
+        buildConfigField("String", "FITMEAL_TELEGRAM_BOT_USERNAME", "\"${configValue("FITMEAL_TELEGRAM_BOT_USERNAME")}\"")
     }
 
     buildFeatures {
@@ -74,6 +84,15 @@ dependencies {
 
     // A4: Google Play Billing for Silver/Gold subscriptions
     implementation("com.android.billingclient:billing-ktx:7.1.1")
+
+    // A5: Firebase Cloud Messaging for push notifications. Working FCM
+    // also requires a `google-services.json` in `app/` (see
+    // `hasGoogleServices` flag above). The dependency itself compiles
+    // and links without that file; runtime calls are wrapped in
+    // try/catch so the app degrades gracefully when Firebase isn't
+    // initialized.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -9,7 +9,19 @@ const PUBLIC_PATHS = [
   "/api/login",
   "/api/logout",
   // Mobile/API routes validate Supabase JWTs in their own handlers.
+  // Adding them to PUBLIC_PATHS here lets the iOS/Android apps call
+  // them without an admin cookie. Each route still 503s if Supabase
+  // isn't configured and validates its own zod body.
   "/api/ai/meal-plan",
+  "/api/mobile-config",
+  "/api/payments/options",
+  "/api/payments/create-khqr",
+  "/api/payments/status",
+  "/api/push/register",
+  "/api/referrals",
+  "/api/notifications/prefs",
+  // Telegram webhook is called by Telegram's servers, not the app.
+  "/api/telegram/webhook",
 ];
 
 /**

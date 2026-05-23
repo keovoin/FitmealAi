@@ -97,6 +97,7 @@ jobs:
           FITMEAL_API_BASE_URL: ""
           FITMEAL_GOOGLE_ANDROID_CLIENT_ID: ""
           FITMEAL_GOOGLE_WEB_CLIENT_ID: ""
+          FITMEAL_TELEGRAM_BOT_USERNAME: ""
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
       - name: Upload APK artifact
         if: success()

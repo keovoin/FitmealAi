@@ -13,7 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fitmealai.domain.AppColorScheme
 import com.fitmealai.domain.SubscriptionTier
 import com.fitmealai.ui.AppSheet
 import com.fitmealai.ui.AppState
@@ -30,6 +32,9 @@ import com.fitmealai.ui.theme.FitMealSpacing
 fun SettingsScreen(state: AppState) {
     val tier by state.tier.collectAsState()
     val session by state.session.collectAsState()
+    val colorScheme by state.colorScheme.collectAsState()
+    val notificationPrefs by state.notificationPrefs.collectAsState()
+    val referralStats by state.referralStats.collectAsState()
     val workout = state.preferencesStore.workoutPrefs
     val meal = state.preferencesStore.mealPrefs
 
@@ -97,6 +102,59 @@ fun SettingsScreen(state: AppState) {
             }
         }
 
+        // Notifications row
+        GlassCard(
+            modifier = Modifier.fillMaxWidth().testTag("android-settings-notifications-button"),
+            onClick = { state.showSheet(AppSheet.NotificationSettings) },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Notifications", color = FitMealColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    notificationSummary(notificationPrefs),
+                    color = FitMealColors.TextSecondary,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        // Referrals row
+        GlassCard(
+            modifier = Modifier.fillMaxWidth().testTag("android-settings-referrals-button"),
+            onClick = { state.showSheet(AppSheet.Referrals) },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Refer & earn", color = FitMealColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    when {
+                        referralStats.code == null -> "Open to generate your code"
+                        referralStats.rewarded -> "Reward earned · 30 days Gold"
+                        else -> "${referralStats.verified}/${referralStats.target.coerceAtLeast(1)} verified"
+                    },
+                    color = FitMealColors.TextSecondary,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        // Theme picker row
+        GlassCard(
+            modifier = Modifier.fillMaxWidth().testTag("android-settings-theme-button"),
+            onClick = { state.showSheet(AppSheet.ThemePicker) },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Appearance", color = FitMealColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    when (colorScheme) {
+                        AppColorScheme.System -> "System default"
+                        AppColorScheme.Dark -> "Dark"
+                        AppColorScheme.Light -> "Light"
+                    },
+                    color = FitMealColors.TextSecondary,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
         // ABA payment shortcut
         SecondaryGlassButton(
             title = "Submit ABA payment",
@@ -109,11 +167,33 @@ fun SettingsScreen(state: AppState) {
         ) { state.signOut() }
 
         Text(
-            "FitMeal AI v0.2.0 (Android A4)",
+            "FitMeal AI v0.3.0 (Android A5)",
             color = FitMealColors.TextTertiary,
             fontSize = 11.sp,
         )
 
         Spacer(Modifier.height(FitMealSpacing.large))
+    }
+}
+
+/**
+ * One-line summary of which notification toggles are on. Mirrors the
+ * iOS pattern of "Daily reminders on" / "All off" / "X of 6 enabled".
+ */
+private fun notificationSummary(prefs: com.fitmealai.domain.NotificationPrefs): String {
+    val flags = listOf(
+        prefs.mealPlanReady,
+        prefs.paymentApproved,
+        prefs.waterReminder,
+        prefs.workoutReminder,
+        prefs.habitStreak,
+        prefs.weeklySummary,
+    )
+    val on = flags.count { it }
+    val telegram = if (prefs.telegramLinked) " · Telegram linked" else ""
+    return when (on) {
+        0 -> "All notifications off$telegram"
+        flags.size -> "All notifications on$telegram"
+        else -> "$on of ${flags.size} enabled$telegram"
     }
 }

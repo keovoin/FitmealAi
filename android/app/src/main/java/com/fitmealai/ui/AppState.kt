@@ -1,6 +1,7 @@
 package com.fitmealai.ui
 
 import android.app.Application
+import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitmealai.config.AppConfig
@@ -11,19 +12,26 @@ import com.fitmealai.data.AuthSession
 import com.fitmealai.data.BillingEvent
 import com.fitmealai.data.BillingHelper
 import com.fitmealai.data.GoogleSignInHelper
+import com.fitmealai.data.MealPlanCache
 import com.fitmealai.data.MockData
+import com.fitmealai.data.NotificationsRepository
 import com.fitmealai.data.PaymentOptionsService
 import com.fitmealai.data.PaymentRepository
 import com.fitmealai.data.PreferencesStore
+import com.fitmealai.data.PushTokenRepository
+import com.fitmealai.data.ReferralsRepository
 import com.fitmealai.data.SessionStore
+import com.fitmealai.domain.AppColorScheme
 import com.fitmealai.domain.FitnessGoal
 import com.fitmealai.domain.MealPrefs
+import com.fitmealai.domain.NotificationPrefs
+import com.fitmealai.domain.ReferralStats
 import com.fitmealai.domain.SubscriptionTier
 import com.fitmealai.domain.WorkoutPrefs
+import com.fitmealai.push.FirebaseTokenRegistrar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -40,9 +48,13 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val aiRepository = AIRepository(config)
     val paymentRepository = PaymentRepository(config)
     val paymentOptionsService = PaymentOptionsService(config)
+    val pushTokenRepository = PushTokenRepository(config)
+    val notificationsRepository = NotificationsRepository(config)
+    val referralsRepository = ReferralsRepository(config)
     val googleSignInHelper = GoogleSignInHelper(config)
     val sessionStore = SessionStore(application)
     val preferencesStore = PreferencesStore(application)
+    val mealPlanCache = MealPlanCache(application)
     val billingHelper = BillingHelper(application)
 
     private val _flow = MutableStateFlow(RootFlow.Splash)
@@ -68,6 +80,15 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val paymentOptions: StateFlow<PaymentOptionsService.Options> =
         _paymentOptions.asStateFlow()
 
+    private val _notificationPrefs = MutableStateFlow(preferencesStore.notificationPrefs)
+    val notificationPrefs: StateFlow<NotificationPrefs> = _notificationPrefs.asStateFlow()
+
+    private val _referralStats = MutableStateFlow(ReferralStats.Empty)
+    val referralStats: StateFlow<ReferralStats> = _referralStats.asStateFlow()
+
+    /** Active light/dark/system selection. Mirrors the StateFlow from PreferencesStore. */
+    val colorScheme: StateFlow<AppColorScheme> = preferencesStore.colorScheme
+
     private var pendingGoal: FitnessGoal = MockData.user.goal
     private var pendingWorkout: WorkoutPrefs = WorkoutPrefs.Default
 
@@ -75,9 +96,6 @@ class AppState(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             bootstrap()
         }
-        // Observe billing events from Play, propagating to our local
-        // tier state. The same flow handles Family-shared / Ask-to-Buy
-        // events that arrive outside the purchase UI.
         viewModelScope.launch {
             billingHelper.activeTier.collect { _tier.value = it }
         }
@@ -96,10 +114,6 @@ class AppState(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Initiates the Play Billing purchase flow for the given tier.
-     * Caller must pass the current Activity (Compose: LocalActivity).
-     */
     fun purchaseTier(activity: android.app.Activity, tier: SubscriptionTier) {
         viewModelScope.launch {
             if (!billingHelper.ensureConnected()) {
@@ -121,22 +135,75 @@ class AppState(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Refreshes per-user payment availability (ABA toggle + region match).
-     * Called when the paywall opens; result is consumed by PaywallScreen
-     * to hide the "Pay with ABA" button outside Cambodia.
-     */
     fun refreshPaymentOptions() {
         viewModelScope.launch {
             _paymentOptions.value = paymentOptionsService.fetch()
         }
     }
 
+    /** Theme picker action. Persists immediately; theme switches on the next frame. */
+    fun setColorScheme(scheme: AppColorScheme) {
+        preferencesStore.saveColorScheme(scheme)
+    }
+
+    // ----- Notification preferences -------------------------------------
+
+    fun refreshNotificationPrefs() {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            val fresh = notificationsRepository.load(s)
+            _notificationPrefs.value = fresh
+            preferencesStore.saveNotificationPrefs(fresh)
+        }
+    }
+
+    fun updateNotificationPrefs(next: NotificationPrefs) {
+        _notificationPrefs.value = next
+        preferencesStore.saveNotificationPrefs(next)
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            notificationsRepository.update(s, next)
+        }
+    }
+
+    // ----- Referrals ----------------------------------------------------
+
+    fun refreshReferralStats() {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            _referralStats.value = referralsRepository.fetchStats(s)
+        }
+    }
+
+    /**
+     * Telegram deep link to start a chat with the bot pre-populated with
+     * the current user's id. `BOT_USERNAME` is configured via gradle
+     * BuildConfig (`FITMEAL_TELEGRAM_BOT_USERNAME`); falls back to a
+     * placeholder so the row stays clickable.
+     */
+    fun telegramLinkUrl(): String? {
+        val s = _session.value ?: return null
+        val bot = config.telegramBotUsername.ifBlank { return null }
+        return "https://t.me/$bot?start=${s.userId}"
+    }
+
+    // ----- Push token registration --------------------------------------
+
+    /**
+     * Pulls a fresh FCM token (if Firebase is configured) and POSTs it
+     * to /api/push/register. Safe to call multiple times. Silent no-op
+     * when Firebase isn't initialized (no google-services.json).
+     */
+    fun registerPushToken() {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            val token = FirebaseTokenRegistrar.fetchToken() ?: return@launch
+            pushTokenRepository.register(s, token)
+        }
+    }
+
     /** Splash → restore session → navigate. */
     private suspend fun bootstrap() {
-        // Pull current Play Billing entitlements in the background; if a user
-        // already has a subscription from a previous install we know it
-        // before the paywall appears.
         viewModelScope.launch {
             runCatching { billingHelper.refreshActiveTier() }
         }
@@ -151,6 +218,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
             if (refreshed != null) {
                 sessionStore.save(refreshed)
                 _session.value = refreshed
+                onSessionEstablished()
                 _flow.value = nextFlowAfterAuth()
             } else {
                 sessionStore.clear()
@@ -158,8 +226,21 @@ class AppState(application: Application) : AndroidViewModel(application) {
             }
         } else {
             _session.value = saved
+            onSessionEstablished()
             _flow.value = nextFlowAfterAuth()
         }
+    }
+
+    /**
+     * Triggered the moment we have a valid session. Kicks off the
+     * always-on background tasks: push token registration, referral
+     * stats, and notification prefs sync. Each one fails gracefully so
+     * a missing API base URL or Firebase config doesn't break the app.
+     */
+    private fun onSessionEstablished() {
+        registerPushToken()
+        refreshNotificationPrefs()
+        refreshReferralStats()
     }
 
     private fun nextFlowAfterAuth(): RootFlow =
@@ -210,6 +291,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _session.value?.let { authRepository.signOut(it) }
             sessionStore.clear()
+            mealPlanCache.clearAll()
             _session.value = null
             _selectedTab.value = MainTab.Home
             _activeSheet.value = null
@@ -220,6 +302,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     private fun handleAuthSuccess(s: AuthSession) {
         sessionStore.save(s)
         _session.value = s
+        onSessionEstablished()
         _flow.value = nextFlowAfterAuth()
     }
 
@@ -262,6 +345,21 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun upgradeTier(tier: SubscriptionTier) { _tier.value = tier }
     fun consumeToast() { _toast.value = null }
     fun setToast(msg: String?) { _toast.value = msg }
+
+    /**
+     * Stable per-install device id used as the referral fingerprint.
+     * Falls back to a hashed timestamp when the system value isn't
+     * available. Not tied to a Google account; just a debounce key
+     * server-side.
+     */
+    fun deviceFingerprint(): String {
+        val cr = getApplication<Application>().contentResolver
+        return runCatching {
+            Settings.Secure.getString(cr, Settings.Secure.ANDROID_ID).orEmpty()
+        }.getOrDefault("").ifBlank {
+            "anon-${getApplication<Application>().packageName.hashCode()}"
+        }
+    }
 }
 
 private fun Throwable.friendly(): String =
@@ -292,4 +390,7 @@ sealed interface AppSheet {
     data class PaymentPending(val transactionId: String, val amount: String) : AppSheet
     data object WorkoutSettings : AppSheet
     data object MealSettings : AppSheet
+    data object NotificationSettings : AppSheet
+    data object Referrals : AppSheet
+    data object ThemePicker : AppSheet
 }
