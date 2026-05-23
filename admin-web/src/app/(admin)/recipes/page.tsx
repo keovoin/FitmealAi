@@ -24,6 +24,7 @@ import {
   Inbox,
   Plus,
   Sparkles,
+  Upload,
   Utensils,
 } from "lucide-react";
 import Link from "next/link";
@@ -116,6 +117,14 @@ export default async function RecipesAdminPage({
       subtitle="Catalog of meals offered by the mobile Shuffle button."
       actions={
         <div className="flex items-center gap-2">
+          <Link
+            href="/recipes/bulk-upload"
+            className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/85 hover:bg-white/[0.14] hover:text-white"
+            data-testid="recipes-bulk-upload-button"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Bulk upload
+          </Link>
           <Link
             href="/recipes/new"
             className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/85 hover:bg-white/[0.14] hover:text-white"

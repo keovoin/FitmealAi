@@ -2,17 +2,19 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/recipes/image-upload-field";
 import { createRecipe, saveRecipe, transitionRecipe } from "@/lib/supabase/admin-actions";
-import type {
-  Recipe,
-  RecipeStatus,
-  RecipeWriteInput,
-  MealType,
-  RecipeIngredient,
+import {
+  slugifyTitle,
+  type Recipe,
+  type RecipeStatus,
+  type RecipeWriteInput,
+  type MealType,
+  type RecipeIngredient,
 } from "@/lib/supabase/recipes-shared";
 import { Check, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -79,6 +81,45 @@ function fromRecipe(r: Recipe | null): FormState {
   };
 }
 
+/**
+ * Same as `fromRecipe` but seeded from a `RecipeWriteInput` (the
+ * shape returned by the AI generate panel). Falls back to the existing
+ * recipe's status so we don't accidentally re-publish a draft when an
+ * admin regenerates over a published row.
+ */
+function fromWriteInput(
+  input: RecipeWriteInput,
+  existing: Recipe | null,
+): FormState {
+  return {
+    title: input.title,
+    description: input.description ?? "",
+    mealType: input.mealType,
+    diets: input.diets ?? [],
+    allergens: input.allergens ?? [],
+    tags: input.tags ?? [],
+    cookTimeMinutes:
+      input.cookTimeMinutes !== null && input.cookTimeMinutes !== undefined
+        ? String(input.cookTimeMinutes)
+        : "",
+    calories: String(input.calories ?? 0),
+    proteinGrams: String(input.proteinGrams ?? 0),
+    carbsGrams: String(input.carbsGrams ?? 0),
+    fatGrams: String(input.fatGrams ?? 0),
+    imageUrl: input.imageUrl ?? "",
+    thumbnailUrl: input.thumbnailUrl ?? "",
+    ingredients:
+      input.ingredients && input.ingredients.length > 0
+        ? input.ingredients
+        : [emptyIngredient()],
+    recipeSteps:
+      input.recipeSteps && input.recipeSteps.length > 0
+        ? input.recipeSteps
+        : [""],
+    status: existing?.status ?? input.status ?? "draft",
+  };
+}
+
 function emptyIngredient(): RecipeIngredient {
   return {
     name: "",
@@ -111,12 +152,33 @@ function toWriteInput(form: FormState): RecipeWriteInput {
   };
 }
 
-export function RecipeForm({ existing }: { existing: Recipe | null }) {
+export function RecipeForm({
+  existing,
+  prefill,
+}: {
+  existing: Recipe | null;
+  /**
+   * Optional pre-filled draft (e.g. from the AI generate panel). When
+   * this prop's identity changes, the form resets to its values. Pass
+   * the same object reference repeatedly to avoid clobbering edits.
+   */
+  prefill?: RecipeWriteInput | null;
+}) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(fromRecipe(existing));
   const [pending, startTransition] = useTransition();
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // When the AI panel hands us a fresh draft, replace the form state.
+  // The dependency on the prefill identity (not its fields) means
+  // typing in the form between generations doesn't get clobbered.
+  useEffect(() => {
+    if (prefill) {
+      setForm(fromWriteInput(prefill, existing));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   const isNew = !existing;
   const macroSum = useMemo(() => {
@@ -488,32 +550,31 @@ export function RecipeForm({ existing }: { existing: Recipe | null }) {
         </ol>
       </div>
 
-      {/* ---------- Image URLs ------------------------------------------- */}
+      {/* ---------- Image picker --------------------------------------- */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
         <p className="text-sm font-semibold text-white">Imagery</p>
         <p className="mt-0.5 text-xs text-white/55">
-          Paste hosted image URLs (e.g. Supabase Storage public URLs). Image
-          generation/upload is a follow-up.
+          Upload a hero image (PNG/JPEG/WebP, up to 8 MB) or paste an
+          existing CDN URL. Stored in the public <code>recipe-images</code>
+          bucket.
         </p>
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <label className="space-y-1 text-xs text-white/60">
-            <span>Hero image URL</span>
-            <input
-              value={form.imageUrl}
-              onChange={(e) => patch("imageUrl", e.target.value)}
-              placeholder="https://…/recipe.jpg"
-              className="glass-input h-9 w-full text-sm"
-            />
-          </label>
-          <label className="space-y-1 text-xs text-white/60">
-            <span>Thumbnail URL</span>
-            <input
-              value={form.thumbnailUrl}
-              onChange={(e) => patch("thumbnailUrl", e.target.value)}
-              placeholder="https://…/recipe_thumb.jpg"
-              className="glass-input h-9 w-full text-sm"
-            />
-          </label>
+          <ImageUploadField
+            label="Hero image"
+            value={form.imageUrl}
+            onChange={(v) => patch("imageUrl", v)}
+            slugHint={existing?.slug ?? slugifyTitle(form.title || "recipe")}
+            testIdPrefix="recipe-image"
+          />
+          <ImageUploadField
+            label="Thumbnail (optional, falls back to hero)"
+            value={form.thumbnailUrl}
+            onChange={(v) => patch("thumbnailUrl", v)}
+            slugHint={
+              (existing?.slug ?? slugifyTitle(form.title || "recipe")) + "-thumb"
+            }
+            testIdPrefix="recipe-thumb"
+          />
         </div>
       </div>
 
