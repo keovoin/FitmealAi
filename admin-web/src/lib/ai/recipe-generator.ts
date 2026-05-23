@@ -6,7 +6,7 @@ import {
   resolveActiveAIProvider,
   type ResolvedAIProvider,
 } from "./openai";
-import { normalizeIngredient, normalizeRecipeShape, parseLooseJson, parseWithEnvelope } from "./json-parse";
+import { normalizeRecipe, parseLooseJson, parseWithEnvelope } from "./json-parse";
 import { buildImagePrompt } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -44,42 +44,39 @@ import {
 // Wire schema fed into OpenAI's response_format=json_object
 // -----------------------------------------------------------------------------
 
-// Aliased ingredient/recipe shapes. The model occasionally renames
-// fields ({"ingredient": "chicken", "weight_g": 150}) instead of the
-// canonical ({"name": "chicken", "grams": 150}); the `normalize*`
-// preprocessors fold those aliases before zod validates so we don't
-// 502 the admin over a synonym mismatch.
-const IngredientSchema = z.preprocess(
-  normalizeIngredient,
-  z.object({
-    name: z.string().min(1).max(80),
-    grams: z.number().int().min(1).max(2000),
-    calories: z.number().int().min(0).max(3000),
-    protein_g: z.number().int().min(0).max(300),
-    carbs_g: z.number().int().min(0).max(300),
-    fat_g: z.number().int().min(0).max(300),
-  }),
-);
+// Plain z.object schemas. Field-alias normalization (the model
+// occasionally returns `{"ingredient": "chicken", "weight_g": 150}`
+// instead of the canonical `{"name": "chicken", "grams": 150}`) is
+// applied via the `transform` parameter to `parseWithEnvelope`
+// rather than baked into the schema with `z.preprocess` — preprocess
+// collapses the inferred output type to `unknown` inside `z.array`,
+// breaking downstream type inference (e.g. `for (const meal of
+// plan.meals)`).
+const IngredientSchema = z.object({
+  name: z.string().min(1).max(80),
+  grams: z.number().int().min(1).max(2000),
+  calories: z.number().int().min(0).max(3000),
+  protein_g: z.number().int().min(0).max(300),
+  carbs_g: z.number().int().min(0).max(300),
+  fat_g: z.number().int().min(0).max(300),
+});
 
-const GeneratedRecipeSchema = z.preprocess(
-  normalizeRecipeShape,
-  z.object({
-    title: z.string().min(2).max(120),
-    description: z.string().max(280).optional(),
-    meal_type: z.enum(["breakfast", "lunch", "dinner", "snack"]),
-    cook_time_minutes: z.number().int().min(1).max(240).optional(),
-    diets: z.array(z.string().min(1).max(40)).max(8),
-    allergens: z.array(z.string().min(1).max(40)).max(20),
-    tags: z.array(z.string().min(1).max(40)).max(20).optional(),
-    calories: z.number().int().min(50).max(2500),
-    protein_g: z.number().int().min(0).max(250),
-    carbs_g: z.number().int().min(0).max(300),
-    fat_g: z.number().int().min(0).max(200),
-    ingredients: z.array(IngredientSchema).min(2).max(15),
-    recipe_steps: z.array(z.string().min(4).max(400)).min(2).max(12),
-    image_prompt: z.string().min(8).max(280),
-  }),
-);
+const GeneratedRecipeSchema = z.object({
+  title: z.string().min(2).max(120),
+  description: z.string().max(280).optional(),
+  meal_type: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+  cook_time_minutes: z.number().int().min(1).max(240).optional(),
+  diets: z.array(z.string().min(1).max(40)).max(8),
+  allergens: z.array(z.string().min(1).max(40)).max(20),
+  tags: z.array(z.string().min(1).max(40)).max(20).optional(),
+  calories: z.number().int().min(50).max(2500),
+  protein_g: z.number().int().min(0).max(250),
+  carbs_g: z.number().int().min(0).max(300),
+  fat_g: z.number().int().min(0).max(200),
+  ingredients: z.array(IngredientSchema).min(2).max(15),
+  recipe_steps: z.array(z.string().min(4).max(400)).min(2).max(12),
+  image_prompt: z.string().min(8).max(280),
+});
 
 type GeneratedRecipe = z.infer<typeof GeneratedRecipeSchema>;
 
@@ -192,7 +189,11 @@ export async function generateRecipeForAdmin(
     // does a bounded recursive search before validating, and on
     // failure throws an Error whose message starts with the observed
     // top-level shape (e.g. "{recipe, meta}: title: Required").
-    parsed = parseWithEnvelope(GeneratedRecipeSchema, parseLooseJson(raw));
+    parsed = parseWithEnvelope(
+      GeneratedRecipeSchema,
+      parseLooseJson(raw),
+      normalizeRecipe,
+    );
   } catch (err) {
     await logFailure(
       opts.adminUserId,

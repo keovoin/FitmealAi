@@ -12,7 +12,7 @@ import {
   buildMealPlanUserPrompt,
 } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
-import { parseLooseJson, parseWithEnvelope } from "./json-parse";
+import { normalizePlan, parseLooseJson, parseWithEnvelope } from "./json-parse";
 import {
   GeneratedMeal,
   GeneratedPlanSchema,
@@ -160,7 +160,11 @@ export async function generateMealPlan(
     // the system prompt. parseWithEnvelope tries direct, peels known
     // keys, walks the object tree, and on failure throws an Error
     // whose message starts with the observed top-level shape.
-    parsed = parseWithEnvelope(GeneratedPlanSchema, parseLooseJson(rawText));
+    parsed = parseWithEnvelope(
+      GeneratedPlanSchema,
+      parseLooseJson(rawText),
+      normalizePlan,
+    );
   } catch (err) {
     await logFailedGeneration(req.user_id, "meal_plan", textModel, "schema_invalid");
     const detail = err instanceof Error ? err.message.slice(0, 220) : "unknown";

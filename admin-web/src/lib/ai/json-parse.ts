@@ -3,41 +3,48 @@ import type { ZodSchema } from "zod";
 /**
  * Forgiving JSON parsers shared by every AI call site.
  *
- * Why this exists:
+ * Three model misbehaviors we tolerate:
  *
- * Even with `response_format: { type: "json_object" }`, models will
- * occasionally return:
+ *   1. The output is wrapped in a markdown code fence
+ *      (` ```json\n{...}\n``` `) or has a leading sentence.
+ *   2. The output is the right shape but nested under a wrapper key,
+ *      e.g. `{"recipe": {"title": "...", ...}}` instead of the flat
+ *      `{"title": "...", ...}`. Wrapper key may be one we've seen
+ *      before (`recipe`, `data`, `output`...) or one the model
+ *      invents (`generated_recipe`, `dish`, ...).
+ *   3. Field names are renamed onto plausible synonyms —
+ *      `{"ingredient": "chicken", "weight_g": 150}` instead of the
+ *      canonical `{"name": "chicken", "grams": 150}`.
  *
- *   1. A bare JSON object wrapped in a markdown code fence
- *      (` ```json\n{...}\n``` `), or with a leading sentence.
- *   2. The right shape but nested under a wrapper key, e.g.
- *      `{"recipe": {"title": "...", ...}}` instead of the flat
- *      `{"title": "...", ...}`. This was causing the production
- *      "title: undefined - schema invalid" error: the model returned
- *      the recipe under a "recipe" envelope and `Schema.parse` on the
- *      outer object correctly failed because it had no `title` field.
- *   3. A wrapper key we haven't seen before — the model invents new
- *      ones occasionally (`generated_recipe`, `output`, `dish`,
- *      `payload`, etc).
- *
- * The two helpers below address each case:
+ * The helpers below address each case:
  *
  *   - `parseLooseJson(raw)` strips a leading ```/```json fence (and a
  *     trailing one) before calling JSON.parse, falling back to the
  *     first balanced `{...}` block found in the string.
  *
- *   - `parseWithEnvelope(schema, obj)` tries, in order:
- *       a. `schema.safeParse(obj)` directly,
- *       b. peeling each "known" envelope key (recipe / meal / data /
- *          result / output / response / ...),
- *       c. recursively walking every nested object up to a small
- *          depth and trying the schema on each (catches arbitrary
- *          wrappers we haven't enumerated).
+ *   - `normalizeIngredient` / `normalizeRecipeShape` /
+ *     `normalizeRecipe` / `normalizePlan` fold common field-name
+ *     aliases onto our canonical schema names. Passed to
+ *     `parseWithEnvelope` as a `transform` so the renaming runs
+ *     against EVERY candidate node (top-level, each known envelope
+ *     key, and each BFS-discovered nested object) — that way a
+ *     `{output: {recipe: {ingredient: "chicken"}}}` shape still
+ *     validates after the BFS finds the inner recipe.
+ *
+ *     They are intentionally NOT wired into the zod schema via
+ *     `z.preprocess`: doing that collapses the inferred output type
+ *     to `unknown` inside `z.array(...)` and breaks downstream type
+ *     inference (e.g. `for (const meal of plan.meals)` typing).
+ *
+ *   - `parseWithEnvelope(schema, obj, transform?)` tries, in order:
+ *       a. `schema.safeParse(transform(obj))` directly,
+ *       b. peel each known envelope key, transform it, retry,
+ *       c. BFS the object tree, transform every nested object,
+ *          retry the schema.
  *     The first match wins. On total failure it throws an Error whose
- *     message contains the top-level keys we observed AND the
- *     canonical zod issue list, so the operator can see whether the
- *     model invented a new envelope key or returned the wrong fields
- *     entirely.
+ *     message starts with the OBSERVED top-level shape (e.g.
+ *     `{recipe, meta}: title: Required`) so the operator can tell
+ *     envelope-mismatch from missing-field at a glance.
  *
  *   - `describeShape(obj)` returns a short "{title, recipe, meta}"
  *     summary used by the AI call sites to enrich their 502 error
@@ -64,6 +71,9 @@ const ENVELOPE_KEYS: readonly string[] = [
 
 /** How deep we walk into nested objects looking for a schema match. */
 const MAX_RECURSION_DEPTH = 4;
+
+/** Identity transform — used as the default when no transform is supplied. */
+const identity = (x: unknown): unknown => x;
 
 /**
  * JSON.parse with two forgiveness rules:
@@ -100,19 +110,21 @@ export function parseLooseJson(raw: string): unknown {
  * MAX_RECURSION_DEPTH and tries the schema on each nested object.
  * This catches arbitrary envelope keys the model invents.
  *
+ * `transform` is applied to EVERY candidate before `safeParse`, so
+ * field-name aliases get folded regardless of how deeply the recipe
+ * is wrapped. Defaults to identity.
+ *
  * Returns the parsed value on success.
  *
  * On failure, throws an Error whose message starts with the top-level
- * keys observed (e.g. `"recipe envelope shape was {recipe} but its
- * inner object also failed: ..."`) so the operator can immediately
- * see whether the model invented a new wrapper or returned wrong
- * fields entirely.
+ * keys observed and the canonical zod issue list.
  */
 export function parseWithEnvelope<T>(
   schema: ZodSchema<T>,
   obj: unknown,
+  transform: (x: unknown) => unknown = identity,
 ): T {
-  const direct = schema.safeParse(obj);
+  const direct = schema.safeParse(transform(obj));
   if (direct.success) return direct.data;
 
   // Try the known envelope keys.
@@ -120,7 +132,7 @@ export function parseWithEnvelope<T>(
     const record = obj as Record<string, unknown>;
     for (const key of ENVELOPE_KEYS) {
       if (key in record) {
-        const peeled = schema.safeParse(record[key]);
+        const peeled = schema.safeParse(transform(record[key]));
         if (peeled.success) return peeled.data;
       }
     }
@@ -128,7 +140,7 @@ export function parseWithEnvelope<T>(
 
   // Last resort: BFS the object tree. Catches `{"foo": {"bar": {...recipe...}}}`
   // and `{"customWrapper": {...}}` shapes we haven't enumerated.
-  const found = findValidNode(schema, obj);
+  const found = findValidNode(schema, obj, transform);
   if (found.found) return found.value;
 
   // Total failure. Build a diagnostic message that surfaces both the
@@ -138,10 +150,13 @@ export function parseWithEnvelope<T>(
   throw new Error(`${shape}: ${message}`);
 }
 
+// ---------------------------------------------------------------------------
+// Field-alias normalizers
+// ---------------------------------------------------------------------------
+
 /**
  * Map common field-name aliases the model tends to use for an
- * ingredient object onto our canonical schema names. Plugged into
- * the ingredient zod schema via `z.preprocess` so a recipe with
+ * ingredient object onto our canonical schema names so a recipe with
  * `{"ingredient": "chicken", "weight_g": 150, "protein": 30}`
  * validates the same as the canonical
  * `{"name": "chicken", "grams": 150, "protein_g": 30}`.
@@ -153,41 +168,32 @@ export function parseWithEnvelope<T>(
  *   protein_g ← protein | proteinGrams
  *   carbs_g   ← carbs | carbohydrates_g | carbohydrates | carbsGrams
  *   fat_g     ← fat | fats | fatGrams
- *
- * Non-object inputs and arrays are returned untouched so the caller's
- * schema can still emit a clear "expected object" error.
  */
 export function normalizeIngredient(obj: unknown): unknown {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
   const o = obj as Record<string, unknown>;
-  const name = firstDefined(o, ["name", "ingredient", "item", "food", "label"]);
-  const grams = firstDefined(o, [
-    "grams",
-    "weight_g",
-    "weight",
-    "quantity_g",
-    "quantity",
-    "amount_g",
-    "amount",
-  ]);
-  const calories = firstDefined(o, ["calories", "kcal", "cal"]);
-  const protein_g = firstDefined(o, ["protein_g", "protein", "proteinGrams"]);
-  const carbs_g = firstDefined(o, [
-    "carbs_g",
-    "carbs",
-    "carbohydrates_g",
-    "carbohydrates",
-    "carbsGrams",
-  ]);
-  const fat_g = firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"]);
   return {
     ...o,
-    name,
-    grams,
-    calories,
-    protein_g,
-    carbs_g,
-    fat_g,
+    name: firstDefined(o, ["name", "ingredient", "item", "food", "label"]),
+    grams: firstDefined(o, [
+      "grams",
+      "weight_g",
+      "weight",
+      "quantity_g",
+      "quantity",
+      "amount_g",
+      "amount",
+    ]),
+    calories: firstDefined(o, ["calories", "kcal", "cal"]),
+    protein_g: firstDefined(o, ["protein_g", "protein", "proteinGrams"]),
+    carbs_g: firstDefined(o, [
+      "carbs_g",
+      "carbs",
+      "carbohydrates_g",
+      "carbohydrates",
+      "carbsGrams",
+    ]),
+    fat_g: firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"]),
   };
 }
 
@@ -196,6 +202,8 @@ export function normalizeIngredient(obj: unknown): unknown {
  * aliases (`mealType`, `proteinGrams`) and a few common synonyms
  * (`steps` → `recipe_steps`) onto the canonical snake_case shape so
  * the model is allowed to be slightly creative without us 502'ing.
+ *
+ * Does NOT recurse into ingredients[]; use `normalizeRecipe` for that.
  */
 export function normalizeRecipeShape(obj: unknown): unknown {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
@@ -233,6 +241,44 @@ export function normalizeRecipeShape(obj: unknown): unknown {
       "imagePrompt",
       "image_description",
     ]),
+  };
+}
+
+/**
+ * Recipe-shape normalizer for the single-recipe call site
+ * (`generateRecipeForAdmin`). Applies `normalizeRecipeShape` at the
+ * top AND maps `normalizeIngredient` over `ingredients[]` so each
+ * sub-object's alias keys are renamed too.
+ */
+export function normalizeRecipe(obj: unknown): unknown {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const top = normalizeRecipeShape(obj) as Record<string, unknown>;
+  const ingredients = top.ingredients;
+  if (Array.isArray(ingredients)) {
+    top.ingredients = ingredients.map(normalizeIngredient);
+  }
+  return top;
+}
+
+/**
+ * Plan-shape normalizer for the meal-plan call site. The plan object
+ * has a `meals: Array<Recipe>`; we normalize each meal as a recipe so
+ * the inner ingredients[] aliases are folded too.
+ *
+ * If the input doesn't look like a plan (no `meals` array), returns
+ * it unchanged so `parseWithEnvelope`'s envelope/BFS phases can keep
+ * unwrapping. This is what makes shapes like
+ * `{output: {meals: [...]}}` work — BFS visits `output`,
+ * `normalizePlan(output)` returns `output` unchanged (it has the
+ * right shape), schema matches.
+ */
+export function normalizePlan(obj: unknown): unknown {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const o = obj as Record<string, unknown>;
+  if (!Array.isArray(o.meals)) return obj;
+  return {
+    ...o,
+    meals: o.meals.map(normalizeRecipe),
   };
 }
 
@@ -288,6 +334,7 @@ interface SearchMiss {
 function findValidNode<T>(
   schema: ZodSchema<T>,
   root: unknown,
+  transform: (x: unknown) => unknown,
 ): SearchHit<T> | SearchMiss {
   const queue: Array<{ node: unknown; depth: number }> = [
     { node: root, depth: 0 },
@@ -301,7 +348,7 @@ function findValidNode<T>(
     seen.add(node);
 
     if (!Array.isArray(node)) {
-      const probe = schema.safeParse(node);
+      const probe = schema.safeParse(transform(node));
       if (probe.success) return { found: true, value: probe.data };
     }
 
