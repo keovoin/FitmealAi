@@ -135,7 +135,10 @@ function resolveOpenAIProvider(): ResolvedAIProvider {
   return {
     id: "openai",
     client: new OpenAI({ apiKey }),
-    textModel: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-4o-mini",
+    // gpt-4.1 is the current default (smarter than gpt-4o-mini, still
+    // ~4x cheaper than gpt-4o). Override with OPENAI_TEXT_MODEL=gpt-4.1-mini
+    // for ~$0.40/$1.60 per 1M tokens if you want to claw back margin.
+    textModel: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-4.1",
     imageModel: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
     supportsImages: true,
   };
@@ -199,7 +202,7 @@ export function getOpenAI(): OpenAI {
 
 /** @deprecated Prefer `resolveActiveAIProvider().textModel`. */
 export function getTextModel(): string {
-  return process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-4o-mini";
+  return process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-4.1";
 }
 
 /** @deprecated Prefer `resolveActiveAIProvider().imageModel`. */

@@ -10,13 +10,30 @@ interface ModelCost {
 }
 
 const MODEL_COSTS: Record<string, ModelCost> = {
-  // gpt-4o-mini text: $0.15 / 1M input, $0.60 / 1M output
+  // ---- gpt-4.1 family (current default) ---------------------------------
+  // gpt-4.1: $2.00 / 1M input, $8.00 / 1M output
+  "gpt-4.1": {
+    inputMicroPerToken: 2.0,
+    outputMicroPerToken: 8.0,
+  },
+  // gpt-4.1-mini: $0.40 / 1M input, $1.60 / 1M output
+  "gpt-4.1-mini": {
+    inputMicroPerToken: 0.4,
+    outputMicroPerToken: 1.6,
+  },
+  // gpt-4.1-nano: $0.10 / 1M input, $0.40 / 1M output
+  "gpt-4.1-nano": {
+    inputMicroPerToken: 0.1,
+    outputMicroPerToken: 0.4,
+  },
+
+  // ---- gpt-4o family (kept for legacy / fallback users) ---------------
+  // gpt-4o-mini: $0.15 / 1M input, $0.60 / 1M output
   "gpt-4o-mini": {
-    inputMicroPerToken: 0.15, // $0.15 per 1M tokens => 0.15 micro per token
+    inputMicroPerToken: 0.15,
     outputMicroPerToken: 0.6,
   },
-  // gpt-4o text: $2.50 / 1M input, $10 / 1M output (just so unknown
-  // bumps don't silently undercount)
+  // gpt-4o: $2.50 / 1M input, $10 / 1M output
   "gpt-4o": {
     inputMicroPerToken: 2.5,
     outputMicroPerToken: 10,

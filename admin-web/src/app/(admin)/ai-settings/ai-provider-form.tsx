@@ -93,7 +93,8 @@ export function AIProviderForm({
           <code className="rounded bg-white/10 px-1 py-0.5 text-[10px]">
             OPENAI_TEXT_MODEL
           </code>{" "}
-          (default <i>gpt-4o-mini</i>),{" "}
+          (default <i>gpt-4.1</i>; set to <i>gpt-4.1-mini</i> to cut
+          spend ~5x),{" "}
           <code className="rounded bg-white/10 px-1 py-0.5 text-[10px]">
             OPENAI_IMAGE_MODEL
           </code>{" "}
