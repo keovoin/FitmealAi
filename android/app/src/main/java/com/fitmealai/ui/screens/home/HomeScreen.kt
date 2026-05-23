@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,10 +29,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitmealai.data.MockData
+import com.fitmealai.data.QuotaCounter
+import com.fitmealai.data.QuotaState
+import com.fitmealai.data.ShuffleException
 import com.fitmealai.domain.MealPlan
+import com.fitmealai.domain.MealType
 import com.fitmealai.domain.SubscriptionTier
 import com.fitmealai.ui.AppState
 import com.fitmealai.ui.AppSheet
@@ -39,6 +45,7 @@ import com.fitmealai.ui.MainTab
 import com.fitmealai.ui.components.GlassCard
 import com.fitmealai.ui.components.PrimaryGradientButton
 import com.fitmealai.ui.components.ScreenContainer
+import com.fitmealai.ui.components.SecondaryGlassButton
 import com.fitmealai.ui.theme.FitMealBrushes
 import com.fitmealai.ui.theme.FitMealColors
 import com.fitmealai.ui.theme.FitMealRadius
@@ -48,10 +55,17 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(state: AppState) {
     val tier by state.tier.collectAsState()
+    val quota by state.quotaState.collectAsState()
     var mealPlan by remember { mutableStateOf<MealPlan>(MockData.mealPlan) }
-    var isRegenerating by remember { mutableStateOf(false) }
+    var isGenerating by remember { mutableStateOf(false) }
+    var isShuffling by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // Refresh quotas every time we land on Home so the counters stay
+    // honest if the user generated/shuffled from another tab. Cheap
+    // (~1 GET) and idempotent server-side.
+    LaunchedEffect(Unit) { state.refreshQuotas() }
 
     val greeting = remember {
         val hour = java.time.LocalTime.now().hour
@@ -155,40 +169,203 @@ fun HomeScreen(state: AppState) {
             Text(error!!, color = FitMealColors.ErrorRed, fontSize = 12.sp)
         }
 
-        PrimaryGradientButton(
-            title = if (isRegenerating) "Regenerating…" else "Regenerate today's plan",
-            isLoading = isRegenerating,
-            tag = "android-home-regenerate-button",
-        ) {
-            val session = state.session.value
-            if (session == null) {
-                error = "Sign in before generating a live AI plan."
-                return@PrimaryGradientButton
-            }
-            scope.launch {
-                isRegenerating = true
-                error = null
-                try {
-                    val plan = state.aiRepository.generateMealPlan(
-                        session = session,
-                        goal = MockData.user.goal.apiValue,
-                        calorieTarget = MockData.user.dailyCalorieTarget,
-                        diets = state.preferencesStore.mealPrefs.diets.toList().sorted(),
-                        allergies = state.preferencesStore.mealPrefs.allergies.toList().sorted(),
-                        cookTime = state.preferencesStore.mealPrefs.cookTime,
-                        mealTypes = state.preferencesStore.mealPrefs.timings.toList().sorted(),
-                    )
-                    mealPlan = plan
-                } catch (t: Throwable) {
-                    error = t.message ?: "AI request failed"
-                } finally {
-                    isRegenerating = false
+        // -----------------------------------------------------------------
+        // Shuffle + Generate action row.
+        //
+        // Both buttons live under today's plan summary. Each shows a
+        // remaining-count subtitle pulled live from /api/quotas. When
+        // the user has 0 remaining we route to AppSheet.Paywall instead
+        // of calling the endpoint. Shuffle is hidden entirely if the
+        // last shuffle attempt returned 503 catalog_not_ready.
+        // -----------------------------------------------------------------
+        QuotaActionRow(
+            quota = quota,
+            isShuffling = isShuffling,
+            isGenerating = isGenerating,
+            onShuffleTap = {
+                if (quota.shuffles.isExhausted) {
+                    state.showSheet(AppSheet.Paywall)
+                    return@QuotaActionRow
                 }
-            }
-        }
+                val session = state.session.value
+                if (session == null) {
+                    error = "Sign in before shuffling recipes."
+                    return@QuotaActionRow
+                }
+                val targetMealType = mealPlan.meals.firstOrNull()?.type ?: MealType.Lunch
+                scope.launch {
+                    isShuffling = true
+                    error = null
+                    try {
+                        val result = state.shuffleRepository.shuffle(
+                            session = session,
+                            mealType = targetMealType,
+                            count = quota.shuffleMealCount,
+                        )
+                        mealPlan = result.mealPlan
+                        state.applyShuffleCounter(result.shuffles)
+                    } catch (cap: ShuffleException.DailyCapReached) {
+                        // Mirror the server-side counter and pop the paywall.
+                        state.applyShuffleCounter(cap.shuffles)
+                        state.showSheet(AppSheet.Paywall)
+                    } catch (_: ShuffleException.CatalogNotReady) {
+                        state.markCatalogNotReady()
+                    } catch (_: ShuffleException.NoMatch) {
+                        error = "No recipes match your diet, allergens, and cook-time."
+                    } catch (t: Throwable) {
+                        error = t.message ?: "Shuffle failed."
+                    } finally {
+                        isShuffling = false
+                    }
+                }
+            },
+            onGenerateTap = {
+                if (quota.ai.isExhausted) {
+                    state.showSheet(AppSheet.Paywall)
+                    return@QuotaActionRow
+                }
+                val session = state.session.value
+                if (session == null) {
+                    error = "Sign in before generating a live AI plan."
+                    return@QuotaActionRow
+                }
+                scope.launch {
+                    isGenerating = true
+                    error = null
+                    try {
+                        val plan = state.aiRepository.generateMealPlan(
+                            session = session,
+                            goal = MockData.user.goal.apiValue,
+                            calorieTarget = MockData.user.dailyCalorieTarget,
+                            diets = state.preferencesStore.mealPrefs.diets.toList().sorted(),
+                            allergies = state.preferencesStore.mealPrefs.allergies.toList().sorted(),
+                            cookTime = state.preferencesStore.mealPrefs.cookTime,
+                            mealTypes = state.preferencesStore.mealPrefs.timings.toList().sorted(),
+                        )
+                        mealPlan = plan
+                        // The /api/ai/meal-plan endpoint doesn't echo the
+                        // post-bump quota, so mirror locally and kick off
+                        // a background re-fetch to stay in sync.
+                        state.applyAiUsedLocally()
+                        state.refreshQuotas()
+                    } catch (t: Throwable) {
+                        error = t.message ?: "AI request failed"
+                    } finally {
+                        isGenerating = false
+                    }
+                }
+            },
+        )
 
         Spacer(Modifier.height(FitMealSpacing.large))
     }
+}
+
+/**
+ * Two-up action row shown beneath today's plan card.
+ *
+ *   ┌─────────────────────┐  ┌─────────────────────┐
+ *   │ 🔀 Shuffle (8 left) │  │ ✨ Generate (1 left)│
+ *   ├─────────────────────┤  ├─────────────────────┤
+ *   │ 2 of 10 used today  │  │ 0 of 1 used today   │
+ *   └─────────────────────┘  └─────────────────────┘
+ *
+ * Mirrors the iOS layout in `HomeDashboardView.swift`. Hides Shuffle
+ * entirely when [QuotaState.catalogNotReady] is true (server returned
+ * 503 catalog_not_ready) so users don't tap into a known dead-end.
+ */
+@Composable
+private fun QuotaActionRow(
+    quota: QuotaState,
+    isShuffling: Boolean,
+    isGenerating: Boolean,
+    onShuffleTap: () -> Unit,
+    onGenerateTap: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(FitMealSpacing.small),
+    ) {
+        if (!quota.catalogNotReady) {
+            QuotaButtonColumn(
+                modifier = Modifier.weight(1f),
+                title = "🔀  ${shuffleButtonLabel(quota.shuffles)}",
+                subtitle = quota.shuffles.subtitle,
+                isLoading = isShuffling,
+                isPrimary = false,
+                tag = "android-home-shuffle-button",
+                onClick = onShuffleTap,
+            )
+        }
+        QuotaButtonColumn(
+            modifier = Modifier.weight(1f),
+            title = "✨  ${generateButtonLabel(quota.ai, isGenerating)}",
+            subtitle = quota.ai.subtitle,
+            isLoading = isGenerating,
+            isPrimary = true,
+            tag = "android-home-generate-button",
+            onClick = onGenerateTap,
+        )
+    }
+}
+
+@Composable
+private fun QuotaButtonColumn(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    isLoading: Boolean,
+    isPrimary: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (isPrimary) {
+            PrimaryGradientButton(
+                title = title,
+                isLoading = isLoading,
+                tag = tag,
+                onClick = onClick,
+            )
+        } else {
+            SecondaryGlassButton(
+                title = title,
+                tag = tag,
+                onClick = onClick,
+            )
+        }
+        Text(
+            subtitle,
+            color = FitMealColors.TextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("$tag-subtitle"),
+        )
+    }
+}
+
+/**
+ * "Shuffle (8 left)" / "Shuffle" for unlimited tiers / "Upgrade" when
+ * Free has hit the cap. The wording mirrors iOS so QA can compare
+ * screenshots.
+ */
+private fun shuffleButtonLabel(counter: QuotaCounter): String {
+    if (counter.unlimited) return "Shuffle"
+    if (counter.isExhausted) return "Upgrade"
+    return "Shuffle (${counter.remaining} left)"
+}
+
+private fun generateButtonLabel(counter: QuotaCounter, isGenerating: Boolean): String {
+    if (isGenerating) return "Generating…"
+    if (counter.unlimited) return "Generate"
+    if (counter.isExhausted) return "Upgrade"
+    return "Generate (${counter.remaining} left)"
 }
 
 @Composable

@@ -34,7 +34,11 @@ struct MainTabView: View {
                 onOpenWorkout: { appState.selectedTab = .workout },
                 onOpenHabits: { appState.selectedTab = .habits },
                 onUpgradeTapped: { appState.activeSheet = .paywall },
-                onRegenerateTapped: { appState.selectedTab = .meals }
+                // Generate now happens in-place on Home (via
+                // ShuffleService / AIService inside HomeDashboardView)
+                // and updates the displayed plan directly. The previous
+                // tab-jump to Meals was removed for parity with Android.
+                onRegenerateTapped: nil
             )
         case .meals:
             MealPlanView(onUpgradeTapped: { appState.activeSheet = .paywall })

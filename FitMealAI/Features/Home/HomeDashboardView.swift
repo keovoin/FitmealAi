@@ -11,6 +11,8 @@ import SwiftUI
 struct HomeDashboardView: View {
     @StateObject private var vm: HomeDashboardViewModel
     @EnvironmentObject private var appState: AppState
+    @State private var isShuffling = false
+    @State private var isGenerating = false
 
     var onOpenMeals: (() -> Void)? = nil
     var onOpenWorkout: (() -> Void)? = nil
@@ -49,9 +51,12 @@ struct HomeDashboardView: View {
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(AppTheme.Colors.errorRed)
             }
-            regenerateButton
+            actionRow
         }
-        .task { await vm.loadLiveProfile(authService: appState.authService) }
+        .task {
+            await vm.loadLiveProfile(authService: appState.authService)
+            await appState.refreshQuotas()
+        }
     }
 
     // MARK: - Sections
@@ -180,11 +185,161 @@ struct HomeDashboardView: View {
         .buttonStyle(PressableScaleStyle())
     }
 
-    private var regenerateButton: some View {
-        PrimaryButton(title: "Regenerate today's plan", icon: "sparkles") {
-            onRegenerateTapped?()
-            Task { await vm.regeneratePlan(aiService: appState.aiService, mealPrefs: appState.preferencesStore.meal) }
+    // MARK: - Quota action row
+
+    /// Two-up action row mirroring `HomeScreen.kt` on Android.
+    ///
+    /// ```
+    ///   ┌─────────────────────┐  ┌─────────────────────┐
+    ///   │ 🔀 Shuffle (8 left) │  │ ✨ Generate (1 left)│
+    ///   ├─────────────────────┤  ├─────────────────────┤
+    ///   │ 2 of 10 used today  │  │ 0 of 1 used today   │
+    ///   └─────────────────────┘  └─────────────────────┘
+    /// ```
+    ///
+    /// Hides the Shuffle column entirely when the catalog is too small
+    /// (server returned 503 catalog_not_ready on a previous attempt) so
+    /// users don't tap into a known dead-end.
+    private var actionRow: some View {
+        let quota = appState.quotaState
+        return HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
+            if !quota.catalogNotReady {
+                quotaButtonColumn(
+                    title: "🔀  \(shuffleButtonLabel(quota.shuffles))",
+                    subtitle: quota.shuffles.subtitle,
+                    isPrimary: false,
+                    isLoading: isShuffling,
+                    isDisabled: isShuffling,
+                    accessibilityID: "ios-home-shuffle-button",
+                    action: handleShuffleTap,
+                )
+            }
+            quotaButtonColumn(
+                title: "✨  \(generateButtonLabel(quota.ai, isGenerating: isGenerating))",
+                subtitle: quota.ai.subtitle,
+                isPrimary: true,
+                isLoading: isGenerating,
+                isDisabled: isGenerating,
+                accessibilityID: "ios-home-generate-button",
+                action: handleGenerateTap,
+            )
         }
+    }
+
+    @ViewBuilder
+    private func quotaButtonColumn(
+        title: String,
+        subtitle: String,
+        isPrimary: Bool,
+        isLoading: Bool,
+        isDisabled: Bool,
+        accessibilityID: String,
+        action: @escaping () -> Void,
+    ) -> some View {
+        VStack(spacing: 6) {
+            if isPrimary {
+                PrimaryButton(
+                    title: title,
+                    isLoading: isLoading,
+                    isDisabled: isDisabled,
+                    action: action,
+                )
+            } else {
+                SecondaryGlassButton(
+                    title: title,
+                    isDisabled: isDisabled,
+                    action: action,
+                )
+            }
+            Text(subtitle)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("\(accessibilityID)-subtitle")
+        }
+        .accessibilityIdentifier(accessibilityID)
+    }
+
+    private func handleShuffleTap() {
+        let quota = appState.quotaState
+        guard !quota.shuffles.isExhausted else {
+            appState.activeSheet = .paywall
+            onUpgradeTapped?()
+            return
+        }
+        let targetType = vm.mealPlan.meals.first?.type ?? .lunch
+        Task { await runShuffle(mealType: targetType) }
+    }
+
+    private func handleGenerateTap() {
+        let quota = appState.quotaState
+        guard !quota.ai.isExhausted else {
+            appState.activeSheet = .paywall
+            onUpgradeTapped?()
+            return
+        }
+        // Preserve the existing `onRegenerateTapped` callback so any
+        // navigation-side wiring (MainTabView swaps to the Meals tab)
+        // still fires.
+        onRegenerateTapped?()
+        Task { await runGenerate() }
+    }
+
+    private func runShuffle(mealType: MealType) async {
+        isShuffling = true
+        defer { isShuffling = false }
+        do {
+            let result = try await appState.shuffleService.shuffle(
+                mealType: mealType,
+                count: appState.quotaState.shuffleMealCount,
+            )
+            vm.applyShuffleResult(result)
+            appState.applyShuffleCounter(result.shuffles)
+        } catch let error as QuotaServiceError {
+            switch error {
+            case .dailyCapReached(let counter):
+                // Mirror server-side counter, then pop the paywall.
+                appState.applyShuffleCounter(counter)
+                appState.activeSheet = .paywall
+                onUpgradeTapped?()
+            case .catalogNotReady:
+                appState.markCatalogNotReady()
+            default:
+                vm.errorMessage = error.localizedDescription
+            }
+        } catch {
+            vm.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func runGenerate() async {
+        isGenerating = true
+        defer { isGenerating = false }
+        await vm.regeneratePlan(
+            aiService: appState.aiService,
+            mealPrefs: appState.preferencesStore.meal,
+        )
+        // Mirror locally and kick off a background refresh so the
+        // counter stays in sync even though /api/ai/meal-plan doesn't
+        // echo the post-bump quota.
+        if vm.errorMessage == nil {
+            appState.applyAiUsedLocally()
+            Task { await appState.refreshQuotas() }
+        }
+    }
+
+    private func shuffleButtonLabel(_ counter: QuotaCounter) -> String {
+        if counter.unlimited { return "Shuffle" }
+        if counter.isExhausted { return "Upgrade" }
+        return "Shuffle (\(counter.remaining) left)"
+    }
+
+    private func generateButtonLabel(_ counter: QuotaCounter, isGenerating: Bool) -> String {
+        if isGenerating { return "Generating…" }
+        if counter.unlimited { return "Generate" }
+        if counter.isExhausted { return "Upgrade" }
+        return "Generate (\(counter.remaining) left)"
     }
 
     // MARK: - Helpers

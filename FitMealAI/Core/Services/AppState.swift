@@ -45,10 +45,18 @@ final class AppState: ObservableObject {
     @Published var activeSheet: AppSheet?
     @Published var latestError: String?
 
+    /// Today's AI + shuffle counters (`{tier, ai, shuffles, shuffle_meal_count}`).
+    /// Refreshed once on bootstrap and after every successful Generate or
+    /// Shuffle so the Home action row's "X of Y used today" subtitles stay
+    /// honest without re-polling.
+    @Published var quotaState: QuotaState = .loading
+
     let config: FitMealConfig
     let authService: AuthService
     let preferencesStore: PreferencesStore
     lazy var aiService = AIService(config: config, authService: authService)
+    lazy var quotaService = QuotaService(config: config, authService: authService)
+    lazy var shuffleService = ShuffleService(config: config, authService: authService)
     lazy var paymentOptionsService = PaymentOptionsService(config: config)
     let subscriptionManager: SubscriptionManager
 
@@ -91,6 +99,10 @@ final class AppState: ObservableObject {
         // even when not authenticated so previews and offline launches
         // still see Free as the default.
         await subscriptionManager.refreshActiveTier()
+
+        if isAuthenticated {
+            await refreshQuotas()
+        }
     }
 
     func routeAfterSplash() {
@@ -105,6 +117,7 @@ final class AppState: ObservableObject {
         currentUser = session.user
         isAuthenticated = true
         rootFlow = hasCompletedOnboarding ? .main : .onboardingGoal
+        Task { await refreshQuotas() }
     }
 
     func rememberGoal(_ goal: FitnessGoal) {
@@ -140,6 +153,46 @@ final class AppState: ObservableObject {
         isAuthenticated = false
         selectedTab = .home
         activeSheet = nil
+        quotaState = .loading
         rootFlow = .login
+    }
+
+    // MARK: - Quota helpers (AI + Shuffle)
+
+    /// Pulls the latest /api/quotas snapshot. Silent on failure so the
+    /// Home tab doesn't spam toasts when offline; the previous values
+    /// keep displaying.
+    func refreshQuotas() async {
+        do {
+            let fresh = try await quotaService.fetch()
+            // Preserve the catalog_not_ready flag — /api/quotas doesn't
+            // expose it; only /api/recipes/shuffle does.
+            var next = fresh
+            next.catalogNotReady = quotaState.catalogNotReady
+            quotaState = next
+        } catch {
+            // Intentionally swallowed.
+        }
+    }
+
+    /// Bumps the local AI counter after a successful /api/ai/meal-plan.
+    /// The server already incremented its own counter; we mirror that
+    /// locally so the Home button updates without re-polling.
+    func applyAiUsedLocally() {
+        guard !quotaState.ai.unlimited else { return }
+        quotaState.ai.used += 1
+    }
+
+    /// Replaces the shuffle counter with the post-bump snapshot returned
+    /// inline by /api/recipes/shuffle.
+    func applyShuffleCounter(_ counter: QuotaCounter) {
+        quotaState.shuffles = counter
+        // A successful shuffle implies the catalog is ready.
+        quotaState.catalogNotReady = false
+    }
+
+    /// Set when /api/recipes/shuffle returned 503 catalog_not_ready.
+    func markCatalogNotReady() {
+        quotaState.catalogNotReady = true
     }
 }

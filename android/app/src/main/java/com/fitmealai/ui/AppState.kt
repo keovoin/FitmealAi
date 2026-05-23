@@ -19,8 +19,12 @@ import com.fitmealai.data.PaymentOptionsService
 import com.fitmealai.data.PaymentRepository
 import com.fitmealai.data.PreferencesStore
 import com.fitmealai.data.PushTokenRepository
+import com.fitmealai.data.QuotaCounter
+import com.fitmealai.data.QuotaRepository
+import com.fitmealai.data.QuotaState
 import com.fitmealai.data.ReferralsRepository
 import com.fitmealai.data.SessionStore
+import com.fitmealai.data.ShuffleRepository
 import com.fitmealai.domain.AppColorScheme
 import com.fitmealai.domain.FitnessGoal
 import com.fitmealai.domain.MealPrefs
@@ -51,6 +55,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val pushTokenRepository = PushTokenRepository(config)
     val notificationsRepository = NotificationsRepository(config)
     val referralsRepository = ReferralsRepository(config)
+    val quotaRepository = QuotaRepository(config)
+    val shuffleRepository = ShuffleRepository(config)
     val googleSignInHelper = GoogleSignInHelper(config)
     val sessionStore = SessionStore(application)
     val preferencesStore = PreferencesStore(application)
@@ -85,6 +91,15 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     private val _referralStats = MutableStateFlow(ReferralStats.Empty)
     val referralStats: StateFlow<ReferralStats> = _referralStats.asStateFlow()
+
+    /**
+     * Today's AI + shuffle counters (`{tier, ai, shuffles, shuffle_meal_count}`).
+     * Refreshed once on session bootstrap and after every successful
+     * Generate / Shuffle so the Home buttons can render their
+     * "3 of 10 used today" subtitles without re-polling.
+     */
+    private val _quotaState = MutableStateFlow(QuotaState.Loading)
+    val quotaState: StateFlow<QuotaState> = _quotaState.asStateFlow()
 
     /** Active light/dark/system selection. Mirrors the StateFlow from PreferencesStore. */
     val colorScheme: StateFlow<AppColorScheme> = preferencesStore.colorScheme
@@ -241,6 +256,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         registerPushToken()
         refreshNotificationPrefs()
         refreshReferralStats()
+        refreshQuotas()
     }
 
     private fun nextFlowAfterAuth(): RootFlow =
@@ -295,6 +311,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
             _session.value = null
             _selectedTab.value = MainTab.Home
             _activeSheet.value = null
+            _quotaState.value = QuotaState.Loading
             _flow.value = RootFlow.Login
         }
     }
@@ -345,6 +362,59 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun upgradeTier(tier: SubscriptionTier) { _tier.value = tier }
     fun consumeToast() { _toast.value = null }
     fun setToast(msg: String?) { _toast.value = msg }
+
+    // -----------------------------------------------------------------------
+    // Quota helpers (AI + Shuffle)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Pulls the latest /api/quotas snapshot for the signed-in user.
+     * Silent on failure (counters fall back to zero) so the Home tab
+     * doesn't toast every time the device is offline.
+     */
+    fun refreshQuotas() {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            runCatching { quotaRepository.fetch(s) }
+                .onSuccess { fresh ->
+                    // Preserve the catalog_not_ready flag — /api/quotas
+                    // doesn't expose it, only /api/recipes/shuffle does.
+                    _quotaState.value = fresh.copy(
+                        catalogNotReady = _quotaState.value.catalogNotReady,
+                    )
+                }
+        }
+    }
+
+    /**
+     * Bumps the local AI counter after a successful /api/ai/meal-plan.
+     * The server already incremented its own counter; we mirror that
+     * locally so the Home button updates without re-polling.
+     */
+    fun applyAiUsedLocally() {
+        val current = _quotaState.value
+        if (current.ai.unlimited) return
+        _quotaState.value = current.copy(
+            ai = current.ai.copy(used = current.ai.used + 1),
+        )
+    }
+
+    /**
+     * Replaces the shuffle counter with the post-bump snapshot returned
+     * inline by /api/recipes/shuffle.
+     */
+    fun applyShuffleCounter(counter: QuotaCounter) {
+        _quotaState.value = _quotaState.value.copy(
+            shuffles = counter,
+            // A successful shuffle implies the catalog is ready.
+            catalogNotReady = false,
+        )
+    }
+
+    /** Set when /api/recipes/shuffle returned 503 catalog_not_ready. */
+    fun markCatalogNotReady() {
+        _quotaState.value = _quotaState.value.copy(catalogNotReady = true)
+    }
 
     /**
      * Stable per-install device id used as the referral fingerprint.
