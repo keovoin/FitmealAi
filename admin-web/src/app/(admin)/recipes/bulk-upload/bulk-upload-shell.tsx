@@ -7,11 +7,17 @@ import {
   parseBulkRecipesJson,
   type BulkParseReport,
 } from "@/lib/recipes/bulk-import";
+import {
+  BULK_RECIPES_CSV_TEMPLATE,
+  spreadsheetFileToRecipesJson,
+} from "@/lib/recipes/spreadsheet-import";
 import { bulkUploadRecipesAction } from "@/lib/supabase/admin-actions";
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  Download,
+  FileSpreadsheet,
   Loader2,
   Upload,
   XCircle,
@@ -20,22 +26,28 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 /**
- * Bulk-upload UI for recipes. Workflow:
+ * Bulk-upload UI for recipes. Accepts JSON (array of rows or
+ * `{recipes: [...]}`), CSV, or Excel `.xlsx` / `.xls`.
  *
- *   1. Admin pastes JSON or picks a `.json` file.
+ * Excel/CSV path: the file is parsed in the browser (SheetJS) into the
+ * same row shape `parseBulkRecipesJson` already understands — that
+ * keeps the server action unchanged and means Excel mistakes (missing
+ * columns, wrong meal type) are reported in the same UI as JSON
+ * mistakes.
+ *
+ * Workflow:
+ *   1. Admin pastes JSON or picks a `.json` / `.csv` / `.xlsx` file.
  *   2. Client-side validation runs immediately and renders a
  *      preview: N parseable rows + per-row error messages.
  *   3. Admin clicks "Insert N drafts" — the server action calls
  *      `upsertRecipe` for each valid row.
  *   4. Result table shows successes vs. failures.
- *
- * Why client-side validation: lets the admin fix obvious typos
- * without round-tripping to the server, and the same validator is
- * re-used server-side so we don't re-implement it twice.
  */
 export function BulkUploadShell() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [text, setText] = useState("");
+  const [pickedFileName, setPickedFileName] = useState<string | null>(null);
+  const [pickedFileError, setPickedFileError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [insertResult, setInsertResult] = useState<
     | {
@@ -58,18 +70,54 @@ export function BulkUploadShell() {
   }
 
   async function readFile(file: File) {
-    const t = await file.text();
-    setText(t);
+    setPickedFileError(null);
+    setPickedFileName(file.name);
     setInsertResult(null);
+    const lower = file.name.toLowerCase();
+    try {
+      if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv")) {
+        // Spreadsheet path: parse client-side into the same JSON row
+        // shape the JSON path produces, then drop into the textarea
+        // so the admin can still review and tweak before uploading.
+        const json = await spreadsheetFileToRecipesJson(file);
+        setText(prettyPrint(json));
+      } else {
+        // Plain text / JSON path.
+        const t = await file.text();
+        setText(t);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPickedFileError(`Could not parse ${file.name}: ${msg}`);
+      setText("");
+    }
   }
 
   function loadSample() {
     setText(BULK_RECIPES_SAMPLE);
+    setPickedFileName(null);
+    setPickedFileError(null);
     setInsertResult(null);
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([BULK_RECIPES_CSV_TEMPLATE], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fitmeal-recipes-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   function clear() {
     setText("");
+    setPickedFileName(null);
+    setPickedFileError(null);
     setInsertResult(null);
   }
 
@@ -101,15 +149,28 @@ export function BulkUploadShell() {
       {/* ---------- Picker / paste -------------------------------- */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-white">Source</p>
-          <div className="flex items-center gap-2">
+          <div>
+            <p className="text-sm font-semibold text-white">Source</p>
+            <p className="text-[11px] text-white/55">
+              Excel (.xlsx), CSV, or JSON. One row per recipe.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadTemplate}
+              className="glass-pill inline-flex items-center gap-1 px-2.5 py-1 text-[11px] text-white/85 hover:bg-white/[0.14] hover:text-white"
+              data-testid="bulk-download-template"
+            >
+              <Download className="h-3 w-3" /> Excel/CSV template
+            </button>
             <button
               type="button"
               onClick={loadSample}
               className="glass-pill px-2.5 py-1 text-[11px] text-white/75 hover:bg-white/[0.14] hover:text-white"
               data-testid="bulk-load-sample"
             >
-              Load sample
+              Load JSON sample
             </button>
             <button
               type="button"
@@ -117,12 +178,12 @@ export function BulkUploadShell() {
               className="glass-pill inline-flex items-center gap-1 px-2.5 py-1 text-[11px] text-white/85 hover:bg-white/[0.14] hover:text-white"
               data-testid="bulk-pick-file"
             >
-              <Upload className="h-3 w-3" /> Pick .json
+              <Upload className="h-3 w-3" /> Pick file
             </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/json,.json"
+              accept=".json,.csv,.xlsx,.xls,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -130,7 +191,7 @@ export function BulkUploadShell() {
                 e.target.value = "";
               }}
             />
-            {text.length > 0 && (
+            {(text.length > 0 || pickedFileName) && (
               <button
                 type="button"
                 onClick={clear}
@@ -142,6 +203,18 @@ export function BulkUploadShell() {
           </div>
         </div>
 
+        {pickedFileName && !pickedFileError && (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-emerald-200">
+            <FileSpreadsheet className="h-3 w-3" /> Loaded {pickedFileName}.
+            Review the parsed rows below before inserting.
+          </p>
+        )}
+        {pickedFileError && (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-200">
+            <AlertTriangle className="h-3 w-3" /> {pickedFileError}
+          </p>
+        )}
+
         <textarea
           value={text}
           onChange={(e) => {
@@ -150,7 +223,7 @@ export function BulkUploadShell() {
           }}
           rows={10}
           spellCheck={false}
-          placeholder='[{ "title": "...", "mealType": "lunch", ... }]'
+          placeholder='[{ "title": "...", "mealType": "lunch", ... }]   — or pick a .xlsx / .csv file'
           className="glass-input mt-3 min-h-[200px] w-full font-mono text-[12px] leading-relaxed"
           data-testid="bulk-textarea"
         />
@@ -193,6 +266,15 @@ export function BulkUploadShell() {
       )}
     </div>
   );
+}
+
+/** Pretty-print a JSON-array string so the textarea preview is readable. */
+function prettyPrint(jsonStr: string): string {
+  try {
+    return JSON.stringify(JSON.parse(jsonStr), null, 2);
+  } catch {
+    return jsonStr;
+  }
 }
 
 function PreviewPanel({ report }: { report: BulkParseReport }) {

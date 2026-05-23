@@ -139,6 +139,116 @@ export function parseWithEnvelope<T>(
 }
 
 /**
+ * Map common field-name aliases the model tends to use for an
+ * ingredient object onto our canonical schema names. Plugged into
+ * the ingredient zod schema via `z.preprocess` so a recipe with
+ * `{"ingredient": "chicken", "weight_g": 150, "protein": 30}`
+ * validates the same as the canonical
+ * `{"name": "chicken", "grams": 150, "protein_g": 30}`.
+ *
+ * Aliases observed in production failures:
+ *   name      ← ingredient | item | food | label
+ *   grams     ← weight_g | weight | quantity_g | quantity | amount_g | amount
+ *   calories  ← kcal | cal
+ *   protein_g ← protein | proteinGrams
+ *   carbs_g   ← carbs | carbohydrates_g | carbohydrates | carbsGrams
+ *   fat_g     ← fat | fats | fatGrams
+ *
+ * Non-object inputs and arrays are returned untouched so the caller's
+ * schema can still emit a clear "expected object" error.
+ */
+export function normalizeIngredient(obj: unknown): unknown {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const o = obj as Record<string, unknown>;
+  const name = firstDefined(o, ["name", "ingredient", "item", "food", "label"]);
+  const grams = firstDefined(o, [
+    "grams",
+    "weight_g",
+    "weight",
+    "quantity_g",
+    "quantity",
+    "amount_g",
+    "amount",
+  ]);
+  const calories = firstDefined(o, ["calories", "kcal", "cal"]);
+  const protein_g = firstDefined(o, ["protein_g", "protein", "proteinGrams"]);
+  const carbs_g = firstDefined(o, [
+    "carbs_g",
+    "carbs",
+    "carbohydrates_g",
+    "carbohydrates",
+    "carbsGrams",
+  ]);
+  const fat_g = firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"]);
+  return {
+    ...o,
+    name,
+    grams,
+    calories,
+    protein_g,
+    carbs_g,
+    fat_g,
+  };
+}
+
+/**
+ * Same idea for the top-level recipe / meal object: fold camelCase
+ * aliases (`mealType`, `proteinGrams`) and a few common synonyms
+ * (`steps` → `recipe_steps`) onto the canonical snake_case shape so
+ * the model is allowed to be slightly creative without us 502'ing.
+ */
+export function normalizeRecipeShape(obj: unknown): unknown {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const o = obj as Record<string, unknown>;
+  return {
+    ...o,
+    meal_type: firstDefined(o, ["meal_type", "mealType", "type", "category"]),
+    cook_time_minutes: firstDefined(o, [
+      "cook_time_minutes",
+      "cookTimeMinutes",
+      "cook_time",
+      "cookTime",
+      "prep_time_minutes",
+      "prepTimeMinutes",
+    ]),
+    protein_g: firstDefined(o, ["protein_g", "protein", "proteinGrams"]),
+    carbs_g: firstDefined(o, [
+      "carbs_g",
+      "carbs",
+      "carbohydrates_g",
+      "carbohydrates",
+      "carbsGrams",
+    ]),
+    fat_g: firstDefined(o, ["fat_g", "fat", "fats", "fatGrams"]),
+    recipe_steps: firstDefined(o, [
+      "recipe_steps",
+      "recipeSteps",
+      "steps",
+      "instructions",
+      "directions",
+      "method",
+    ]),
+    image_prompt: firstDefined(o, [
+      "image_prompt",
+      "imagePrompt",
+      "image_description",
+    ]),
+  };
+}
+
+function firstDefined(
+  obj: Record<string, unknown>,
+  keys: readonly string[],
+): unknown {
+  for (const k of keys) {
+    if (k in obj && obj[k] !== undefined && obj[k] !== null) {
+      return obj[k];
+    }
+  }
+  return undefined;
+}
+
+/**
  * Short human-readable summary of an unknown value's shape, used in
  * error payloads so operators can see what the model returned without
  * dumping the full body.
