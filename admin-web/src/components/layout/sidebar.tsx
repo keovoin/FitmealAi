@@ -2,10 +2,12 @@
 
 import { cn } from "@/lib/cn";
 import {
+  Bell,
   CreditCard,
   LayoutDashboard,
   Leaf,
   Settings,
+  Share2,
   Users,
   Wallet,
 } from "lucide-react";
@@ -22,6 +24,8 @@ const NAV = [
   { href: "/payments", label: "Payments", icon: Wallet, badgeKey: "pendingPayments" as const },
   { href: "/users", label: "Users", icon: Users },
   { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/referrals", label: "Referrals", icon: Share2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

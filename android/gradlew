@@ -1,40 +1,43 @@
 #!/bin/sh
+#
+# Lightweight Gradle launcher for FitMeal AI Android.
+#
+# This is NOT the full upstream Gradle wrapper -- the original
+# 907-byte hand-rolled gradlew shipped here was broken:
+#   DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+# When the shell expanded $DEFAULT_JVM_OPTS unquoted, the literal
+# double quotes survived word-splitting and `java` saw "-Xmx64m"
+# (with embedded quotes) as a class name and crashed with
+# "Could not find or load main class \"-Xmx64m\"".
+#
+# Rather than ship the upstream wrapper.jar binary, this stub shells
+# out to a `gradle` already on PATH at the version pinned in
+# gradle/wrapper/gradle-wrapper.properties. CI installs gradle via
+# gradle/actions/setup-gradle@v4 with `gradle-version: 8.10.2`, so
+# `gradle` is on PATH there. Locally, install with sdkman or brew.
+#
 
-# Gradle start up script for POSIX generated for FitMeal AI Android.
+set -e
 
-APP_HOME=$(cd "${0%/*}" >/dev/null 2>&1 && pwd -P) || exit
-APP_NAME="Gradle"
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+APP_HOME=$(cd "${0%/*}" >/dev/null 2>&1 && pwd -P) || exit 1
 
-warn () {
-    echo "$*"
-}
+if ! command -v gradle >/dev/null 2>&1; then
+    cat >&2 <<EOF
+Error: 'gradle' is not on PATH.
 
-die () {
-    echo
-    echo "$*"
-    echo
-    exit 1
-}
+This project does not bundle a Gradle wrapper jar. Install Gradle
+locally (matching gradle/wrapper/gradle-wrapper.properties) and
+re-run from android/:
 
-if [ -n "$JAVA_HOME" ] ; then
-    JAVACMD="$JAVA_HOME/bin/java"
-    if [ ! -x "$JAVACMD" ] ; then
-        die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
-    fi
-else
-    JAVACMD="java"
-    command -v java >/dev/null 2>&1 || die "ERROR: Java is required to run Gradle. Install JDK 17 and set JAVA_HOME."
+  sdk install gradle 8.10.2     # via sdkman
+  brew install gradle@8         # via Homebrew
+
+Then:
+
+  gradle :app:assembleDebug
+EOF
+    exit 127
 fi
 
-CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-GRADLE_OPTS=${GRADLE_OPTS:-}
-JAVA_OPTS=${JAVA_OPTS:-}
-
-set -- \
-    "-Dorg.gradle.appname=$APP_NAME" \
-    -classpath "$CLASSPATH" \
-    org.gradle.wrapper.GradleWrapperMain \
-    "$@"
-
-exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "$@"
+cd "$APP_HOME"
+exec gradle "$@"

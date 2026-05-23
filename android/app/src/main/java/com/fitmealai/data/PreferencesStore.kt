@@ -2,17 +2,27 @@ package com.fitmealai.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.fitmealai.domain.AppColorScheme
 import com.fitmealai.domain.MealPrefs
+import com.fitmealai.domain.NotificationPrefs
 import com.fitmealai.domain.WorkoutPrefs
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * UserDefaults equivalent for meal/workout prefs. Mirrors iOS
- * `Core/Services/PreferencesStore.swift`.
+ * UserDefaults equivalent for non-sensitive client preferences. Mirrors iOS
+ * `Core/Services/PreferencesStore.swift` plus an additional cache of
+ * `NotificationPrefs` so the toggle UI can render instantly while the
+ * server round-trip resolves.
  *
  * Backed by plain SharedPreferences (not encrypted) since the values
- * here are non-sensitive (diet choices etc).
+ * here are non-sensitive (diet choices, theme mode, notification toggles).
+ *
+ * Theme is exposed as a `StateFlow` so `MainActivity` can recompose the
+ * Material theme when the user picks a different scheme.
  */
 class PreferencesStore(context: Context) {
 
@@ -24,6 +34,12 @@ class PreferencesStore(context: Context) {
 
     var mealPrefs: MealPrefs = readMeal()
         private set
+
+    var notificationPrefs: NotificationPrefs = readNotificationPrefs()
+        private set
+
+    private val _colorScheme = MutableStateFlow(readColorScheme())
+    val colorScheme: StateFlow<AppColorScheme> = _colorScheme.asStateFlow()
 
     fun saveWorkoutPrefs(prefs: WorkoutPrefs) {
         workoutPrefs = prefs
@@ -42,6 +58,29 @@ class PreferencesStore(context: Context) {
             .put("cookTime", prefs.cookTime)
             .put("allergies", JSONArray(prefs.allergies.toList()))
         this.prefs.edit().putString(KEY_MEAL, json.toString()).apply()
+    }
+
+    fun saveColorScheme(scheme: AppColorScheme) {
+        _colorScheme.value = scheme
+        prefs.edit().putString(KEY_COLOR_SCHEME, scheme.storageValue).apply()
+    }
+
+    /**
+     * Caches the latest server-side notification prefs so the UI can
+     * render synchronously on next launch. The actual source of truth
+     * lives in Supabase (`notification_prefs` table).
+     */
+    fun saveNotificationPrefs(prefs: NotificationPrefs) {
+        notificationPrefs = prefs
+        val json = JSONObject()
+            .put("meal_plan_ready", prefs.mealPlanReady)
+            .put("payment_approved", prefs.paymentApproved)
+            .put("water_reminder", prefs.waterReminder)
+            .put("workout_reminder", prefs.workoutReminder)
+            .put("habit_streak", prefs.habitStreak)
+            .put("weekly_summary", prefs.weeklySummary)
+            .put("telegram_linked", prefs.telegramLinked)
+        this.prefs.edit().putString(KEY_NOTIFICATIONS, json.toString()).apply()
     }
 
     private fun readWorkout(): WorkoutPrefs {
@@ -69,6 +108,27 @@ class PreferencesStore(context: Context) {
         }.getOrDefault(MealPrefs.Default)
     }
 
+    private fun readNotificationPrefs(): NotificationPrefs {
+        val raw = prefs.getString(KEY_NOTIFICATIONS, null) ?: return NotificationPrefs.Default
+        return runCatching {
+            val obj = JSONObject(raw)
+            NotificationPrefs(
+                mealPlanReady = obj.optBoolean("meal_plan_ready", true),
+                paymentApproved = obj.optBoolean("payment_approved", true),
+                waterReminder = obj.optBoolean("water_reminder", true),
+                workoutReminder = obj.optBoolean("workout_reminder", true),
+                habitStreak = obj.optBoolean("habit_streak", true),
+                weeklySummary = obj.optBoolean("weekly_summary", true),
+                telegramLinked = obj.optBoolean("telegram_linked", false),
+            )
+        }.getOrDefault(NotificationPrefs.Default)
+    }
+
+    private fun readColorScheme(): AppColorScheme {
+        val raw = prefs.getString(KEY_COLOR_SCHEME, null) ?: return AppColorScheme.System
+        return AppColorScheme.fromStorage(raw)
+    }
+
     private fun JSONObject.toStringSet(key: String): Set<String> {
         val arr = optJSONArray(key) ?: return emptySet()
         return (0 until arr.length()).mapNotNull { arr.optString(it).ifBlank { null } }.toSet()
@@ -78,5 +138,7 @@ class PreferencesStore(context: Context) {
         private const val FILE = "fitmeal_prefs_v1"
         private const val KEY_WORKOUT = "workout_prefs"
         private const val KEY_MEAL = "meal_prefs"
+        private const val KEY_COLOR_SCHEME = "color_scheme"
+        private const val KEY_NOTIFICATIONS = "notification_prefs"
     }
 }

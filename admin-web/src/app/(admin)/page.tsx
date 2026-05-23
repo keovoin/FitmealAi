@@ -11,6 +11,7 @@ import {
   getDashboardSnapshotFromDb,
   getMrrHistory,
   listPayments,
+  type MrrDataPoint,
 } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { classifySupabaseError } from "@/lib/supabase/setup-check";
@@ -49,14 +50,16 @@ export default async function DashboardPage() {
 
   let snapshot;
   let recentPayments: Awaited<ReturnType<typeof listPayments>> = [];
+  let mrrHistory: MrrDataPoint[] = [];
 
   try {
-    const [snapshotRes, allPayments, mrrHistory] = await Promise.all([
+    const [snapshotRes, allPayments, mrrHistoryRes] = await Promise.all([
       getDashboardSnapshotFromDb(),
       listPayments(),
       getMrrHistory(8),
     ]);
     snapshot = snapshotRes;
+    mrrHistory = mrrHistoryRes;
     recentPayments = allPayments
       .filter((p) => p.status === "pending")
       .slice(0, 4);

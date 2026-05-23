@@ -22,12 +22,15 @@ jobs:
         working-directory: admin-web
     steps:
       - uses: actions/checkout@v4
+      # The repo does not ship a package-lock.json (admin-web/.gitignore
+      # is permissive about it), so we cannot use `cache: npm` here -- the
+      # action would error with "Some specified paths were not resolved,
+      # unable to cache dependencies." Drop the cache and use `npm install`
+      # instead of `npm ci` for the same reason.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: admin-web/package-lock.json
-      - run: npm ci --no-audit --no-fund
+      - run: npm install --no-audit --no-fund
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Lint
@@ -50,6 +53,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Parse all Swift files
+        # The swift:6.2 image's /bin/sh is dash, which does NOT support
+        # `set -o pipefail` (errors with "Illegal option -o pipefail").
+        # Force bash so pipefail and the rest of the script work the
+        # same way locally and in CI.
+        shell: bash
         run: |
           set -euo pipefail
           fail=0
@@ -84,9 +92,14 @@ jobs:
         with:
           api-level: 35
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+      # The android/ directory does NOT ship a gradle-wrapper.jar, and
+      # the previous hand-rolled gradlew script broke `java` startup
+      # with literal-quoted JVM args (DEFAULT_JVM_OPTS='"-Xmx64m"...').
+      # Pin a Gradle version explicitly so `gradle` is on PATH and the
+      # gradlew shim can shell out to it.
       - uses: gradle/actions/setup-gradle@v4
-      - name: Make wrapper executable
-        run: chmod +x ./gradlew
+        with:
+          gradle-version: "8.10.2"
       - name: Assemble debug APK
         env:
           # Optional config values are empty by default so the build
@@ -97,7 +110,8 @@ jobs:
           FITMEAL_API_BASE_URL: ""
           FITMEAL_GOOGLE_ANDROID_CLIENT_ID: ""
           FITMEAL_GOOGLE_WEB_CLIENT_ID: ""
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          FITMEAL_TELEGRAM_BOT_USERNAME: ""
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -119,9 +133,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Install pg-query-emscripten LOCALLY in the workspace (not -g)
+      # so that `node -e "require(...)"` can resolve it from
+      # ./node_modules. The previous `npm install -g` placed it in a
+      # path Node's eval-mode resolution didn't search, producing
+      # "Cannot find module 'pg-query-emscripten'".
       - name: Install pg-query-emscripten
-        run: npm install -g pg-query-emscripten@5
+        run: npm install --no-save --no-audit --no-fund pg-query-emscripten@5
       - name: Parse migrations
+        shell: bash
         run: |
           set -euo pipefail
           fail=0

@@ -475,3 +475,159 @@ private fun mealTypeFor(value: String): MealType = when (value) {
     "dinner" -> MealType.Dinner
     else -> MealType.Snack
 }
+
+
+
+// ---------------------------------------------------------------------------
+// PushTokenRepository — POST /api/push/register
+// ---------------------------------------------------------------------------
+
+/**
+ * Registers the device's FCM token with the admin-web backend so we can
+ * deliver push notifications to this user. Mirrors the iOS APNs token
+ * upload (planned). The endpoint upserts (user_id, platform, token) in
+ * Supabase `push_tokens`.
+ */
+class PushTokenRepository(private val config: AppConfig = AppConfig()) {
+
+    suspend fun register(session: AuthSession, fcmToken: String) {
+        if (config.apiBaseUrl.isBlank() || fcmToken.isBlank()) return
+        val url = "${config.apiBaseUrl.trimEnd('/')}/api/push/register"
+        runCatching {
+            postJson(
+                url = url,
+                body = JSONObject()
+                    .put("user_id", session.userId)
+                    .put("platform", "android")
+                    .put("token", fcmToken),
+                headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationsRepository — GET/PUT /api/notifications/prefs
+// ---------------------------------------------------------------------------
+
+class NotificationsRepository(private val config: AppConfig = AppConfig()) {
+
+    suspend fun load(session: AuthSession): com.fitmealai.domain.NotificationPrefs {
+        if (config.apiBaseUrl.isBlank()) return com.fitmealai.domain.NotificationPrefs.Default
+        val url = "${config.apiBaseUrl.trimEnd('/')}/api/notifications/prefs?user_id=${session.userId}"
+        return runCatching {
+            val res = getJson(
+                url = url,
+                headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+            )
+            com.fitmealai.domain.NotificationPrefs(
+                mealPlanReady = res.optBoolean("meal_plan_ready", true),
+                paymentApproved = res.optBoolean("payment_approved", true),
+                waterReminder = res.optBoolean("water_reminder", true),
+                workoutReminder = res.optBoolean("workout_reminder", true),
+                habitStreak = res.optBoolean("habit_streak", true),
+                weeklySummary = res.optBoolean("weekly_summary", true),
+                telegramLinked = res.optBoolean("telegram_linked", false),
+            )
+        }.getOrDefault(com.fitmealai.domain.NotificationPrefs.Default)
+    }
+
+    suspend fun update(session: AuthSession, prefs: com.fitmealai.domain.NotificationPrefs) {
+        if (config.apiBaseUrl.isBlank()) return
+        val url = "${config.apiBaseUrl.trimEnd('/')}/api/notifications/prefs"
+        val body = JSONObject()
+            .put("user_id", session.userId)
+            .put("meal_plan_ready", prefs.mealPlanReady)
+            .put("payment_approved", prefs.paymentApproved)
+            .put("water_reminder", prefs.waterReminder)
+            .put("workout_reminder", prefs.workoutReminder)
+            .put("habit_streak", prefs.habitStreak)
+            .put("weekly_summary", prefs.weeklySummary)
+        // Use PUT verbatim — the server accepts both PUT (admin-web route)
+        // and POST handlers fall through; the user-facing route is PUT.
+        runCatching {
+            putJson(
+                url = url,
+                body = body,
+                headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferralsRepository — GET/POST /api/referrals
+// ---------------------------------------------------------------------------
+
+class ReferralsRepository(private val config: AppConfig = AppConfig()) {
+
+    suspend fun fetchStats(session: AuthSession): com.fitmealai.domain.ReferralStats {
+        if (config.apiBaseUrl.isBlank()) return com.fitmealai.domain.ReferralStats.Empty
+        val url = "${config.apiBaseUrl.trimEnd('/')}/api/referrals?user_id=${session.userId}"
+        return runCatching {
+            val res = getJson(
+                url = url,
+                headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+            )
+            com.fitmealai.domain.ReferralStats(
+                code = res.optString("code").ifBlank { null },
+                verified = res.optInt("verified", 0),
+                pending = res.optInt("pending", 0),
+                target = res.optInt("target", 3),
+                rewarded = res.optBoolean("rewarded", false),
+            )
+        }.getOrDefault(com.fitmealai.domain.ReferralStats.Empty)
+    }
+
+    /**
+     * Apply someone else's referral code as part of this user's signup.
+     * Server enforces self-referral / device-fingerprint anti-abuse.
+     */
+    suspend fun apply(
+        session: AuthSession,
+        code: String,
+        deviceFingerprint: String,
+    ): Result<Unit> {
+        if (config.apiBaseUrl.isBlank()) {
+            return Result.failure(AuthException("API base URL not configured"))
+        }
+        val url = "${config.apiBaseUrl.trimEnd('/')}/api/referrals"
+        return runCatching {
+            postJson(
+                url = url,
+                body = JSONObject()
+                    .put("referral_code", code.uppercase())
+                    .put("referred_user_id", session.userId)
+                    .put("device_fingerprint", deviceFingerprint),
+                headers = mapOf("Authorization" to "Bearer ${session.accessToken}"),
+            )
+            Unit
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helper for PUT (parity with the GET/POST helpers above).
+// ---------------------------------------------------------------------------
+
+private suspend fun putJson(
+    url: String,
+    body: JSONObject,
+    headers: Map<String, String>,
+): JSONObject = withContext(Dispatchers.IO) {
+    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+        requestMethod = "PUT"
+        connectTimeout = 15_000
+        readTimeout = 30_000
+        doOutput = true
+        setRequestProperty("Content-Type", "application/json")
+        headers.forEach { (key, value) -> setRequestProperty(key, value) }
+    }
+    connection.outputStream.use { it.write(body.toString().toByteArray()) }
+    val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+    val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
+    if (connection.responseCode !in 200..299) {
+        throw AuthException("Request failed (${connection.responseCode}): ${text.take(200)}")
+    }
+    if (text.isBlank()) JSONObject() else JSONObject(text)
+}

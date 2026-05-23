@@ -167,3 +167,62 @@ data class PaymentRequest(
     val status: PaymentStatus = PaymentStatus.Draft,
     val submittedAt: Long? = null,
 )
+
+
+
+// ---------------------------------------------------------------------------
+// Theme + notification preferences (mirrors iOS Core/Services/PreferencesStore.swift
+// `AppColorScheme` and the server-side `notification_prefs` table).
+// ---------------------------------------------------------------------------
+
+enum class AppColorScheme(val storageValue: String, val displayName: String) {
+    System("system", "System"),
+    Dark("dark", "Dark"),
+    Light("light", "Light");
+
+    companion object {
+        fun fromStorage(raw: String): AppColorScheme = entries.firstOrNull { it.storageValue == raw } ?: System
+    }
+}
+
+/**
+ * Mirror of the server-side `notification_prefs` row. Defaults match the
+ * Postgres column defaults (booleans true, telegram_linked false).
+ */
+data class NotificationPrefs(
+    val mealPlanReady: Boolean,
+    val paymentApproved: Boolean,
+    val waterReminder: Boolean,
+    val workoutReminder: Boolean,
+    val habitStreak: Boolean,
+    val weeklySummary: Boolean,
+    val telegramLinked: Boolean,
+) {
+    companion object {
+        val Default = NotificationPrefs(
+            mealPlanReady = true,
+            paymentApproved = true,
+            waterReminder = true,
+            workoutReminder = true,
+            habitStreak = true,
+            weeklySummary = true,
+            telegramLinked = false,
+        )
+    }
+}
+
+/**
+ * Snapshot returned by GET /api/referrals?user_id=. Mirrors the JSON
+ * shape produced by `admin-web/src/app/api/referrals/route.ts`.
+ */
+data class ReferralStats(
+    val code: String?,
+    val verified: Int,
+    val pending: Int,
+    val target: Int,
+    val rewarded: Boolean,
+) {
+    companion object {
+        val Empty = ReferralStats(code = null, verified = 0, pending = 0, target = 3, rewarded = false)
+    }
+}

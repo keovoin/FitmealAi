@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Google Play Billing for Silver/Gold subscriptions. -->
     <uses-permission android:name="com.android.vending.BILLING" />
+    <!-- Required on Android 13 (API 33) and up to display notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -21,5 +23,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- FCM listener. Real delivery requires a google-services.json
+             in app/. Without it, this service still registers but is
+             never invoked because Firebase fails to initialize. -->
+        <service
+            android:name=".push.FitMealMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default notification channel for FCM data messages. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="fitmeal_default" />
     </application>
 </manifest>
