@@ -54,7 +54,6 @@ interface ReferralCodeRow {
   user_id: string;
   code: string;
   created_at: string;
-  profiles: ProfileLite | null;
 }
 
 interface ReferralRow {
@@ -79,19 +78,20 @@ function userLabel(profile: ProfileLite | null | undefined, fallbackId: string):
 export async function listReferralCodes(): Promise<AdminReferralCode[]> {
   const sb = getSupabaseAdmin();
 
-  // Codes joined with profile.
+  // 1. Pull every referral_codes row. We CANNOT use PostgREST's embedded
+  //    select (`profiles ( display_name, email )`) here because
+  //    referral_codes.user_id is FK to `auth.users(id)`, not `profiles(id)`,
+  //    and PostgREST won't traverse that two-hop relationship -- it errors
+  //    with "Could not find a relationship between 'referral_codes' and
+  //    'profiles' in the schema cache."
   const { data: codes, error } = await sb
     .from("referral_codes")
-    .select(
-      `id,user_id,code,created_at,
-       profiles ( display_name, email )`,
-    )
+    .select("id,user_id,code,created_at")
     .order("created_at", { ascending: false })
     .limit(500);
   if (error) throw new Error(`listReferralCodes: ${error.message}`);
 
-  // All referrals so we can compute counts in-memory (fewer queries than
-  // 3 RPCs per code; the table will be small for a long time).
+  // 2. Pull every referral so we can compute counts in-memory.
   const { data: refs, error: refErr } = await sb
     .from("referrals")
     .select("referrer_id,status");
@@ -106,13 +106,19 @@ export async function listReferralCodes(): Promise<AdminReferralCode[]> {
     counts.set(r.referrer_id, slot);
   }
 
-  return ((codes ?? []) as unknown as ReferralCodeRow[]).map((row) => {
+  // 3. Resolve display_name/email by id in a single round-trip.
+  const codeRows = (codes ?? []) as ReferralCodeRow[];
+  const ids = Array.from(new Set(codeRows.map((r) => r.user_id)));
+  const profilesById = await fetchProfilesById(ids);
+
+  return codeRows.map((row) => {
     const c = counts.get(row.user_id) ?? { pending: 0, verified: 0, rewarded: 0 };
+    const profile = profilesById.get(row.user_id) ?? null;
     return {
       id: row.id,
       userId: row.user_id,
-      userName: userLabel(row.profiles, row.user_id),
-      userEmail: row.profiles?.email ?? "",
+      userName: userLabel(profile, row.user_id),
+      userEmail: profile?.email ?? "",
       code: row.code,
       createdAt: row.created_at,
       pending: c.pending,
@@ -120,6 +126,28 @@ export async function listReferralCodes(): Promise<AdminReferralCode[]> {
       rewarded: c.rewarded,
     };
   });
+}
+
+/**
+ * Batch profile lookup. Returns a map keyed by `profiles.id`. Empty
+ * map when there are no ids or the profiles table is missing/empty.
+ */
+async function fetchProfilesById(ids: string[]): Promise<Map<string, ProfileLite>> {
+  if (ids.length === 0) return new Map();
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id,display_name,email")
+    .in("id", ids);
+  if (error) throw new Error(`fetchProfilesById: ${error.message}`);
+  return new Map<string, ProfileLite>(
+    (data ?? []).map(
+      (p: { id: string; display_name: string | null; email: string }) => [
+        p.id,
+        { display_name: p.display_name, email: p.email },
+      ],
+    ),
+  );
 }
 
 export async function listAllReferrals(): Promise<AdminReferral[]> {

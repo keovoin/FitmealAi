@@ -28,6 +28,11 @@ const REQUIRED_TABLES = [
   "payment_requests",
   "ai_generations",
   "app_settings",
+  // 0014 — push tokens + referrals
+  "push_tokens",
+  "notification_prefs",
+  "referral_codes",
+  "referrals",
 ] as const;
 
 export type RequiredTable = (typeof REQUIRED_TABLES)[number];
