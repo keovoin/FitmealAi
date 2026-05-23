@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./server";
 import { setAbaPaymentSettings, type AbaPaymentSettings } from "./app-settings";
 import {
+  setAIProviderSettings,
+  type AIProviderSettings,
+} from "./ai-provider";
+import {
   setNotificationTemplates,
   type NotificationTemplates,
 } from "./notification-templates";
@@ -277,6 +281,28 @@ export async function setReferralStatus(
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/referrals");
+  return { ok: true };
+}
+
+/**
+ * Persist the active AI provider choice (OpenAI cloud vs custom
+ * OpenAI-compatible endpoint). Effective immediately for every
+ * subsequent AI call because `resolveActiveAIProvider()` re-reads
+ * `app_settings` per request.
+ */
+export async function updateAIProviderSettings(
+  next: AIProviderSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  try {
+    await setAIProviderSettings(next);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath("/ai-settings");
+  revalidatePath("/setup");
   return { ok: true };
 }
 
