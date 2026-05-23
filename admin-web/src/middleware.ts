@@ -20,6 +20,9 @@ const PUBLIC_PATHS = [
   "/api/push/register",
   "/api/referrals",
   "/api/notifications/prefs",
+  // Phase 5 mobile-facing endpoints (catalog shuffle + quota readout).
+  "/api/quotas",
+  "/api/recipes/shuffle",
   // Telegram webhook is called by Telegram's servers, not the app.
   "/api/telegram/webhook",
 ];

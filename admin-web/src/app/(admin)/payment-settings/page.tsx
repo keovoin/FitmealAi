@@ -3,9 +3,11 @@ import { PageShell } from "@/components/layout/page-shell";
 import { ConfigureSupabaseBanner } from "@/components/ui/configure-supabase-banner";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAbaPaymentSettings } from "@/lib/supabase/app-settings";
+import { getPricingOffers } from "@/lib/supabase/pricing-offers";
 import { DocLink } from "@/components/ui/doc-link";
 import { AbaPaymentToggle } from "./aba-payment-toggle";
-import { Banknote, Globe, Wallet } from "lucide-react";
+import { PricingOffersForm } from "./pricing-offers-form";
+import { Banknote, Globe, Sparkles, Wallet } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +21,10 @@ export default async function PaymentSettingsPage() {
     );
   }
 
-  const aba = await getAbaPaymentSettings();
+  const [aba, offers] = await Promise.all([
+    getAbaPaymentSettings(),
+    getPricingOffers(),
+  ]);
 
   return (
     <PageShell
@@ -60,6 +65,36 @@ export default async function PaymentSettingsPage() {
             initialEnabled={aba.enabled}
             initialAllowedRegions={aba.allowedRegions}
           />
+        </GlassCard>
+
+        {/* Pricing offers (trial + first-payment discount) -----------------*/}
+        <GlassCard className="lg:col-span-2" data-testid="pricing-offers-card">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-white/50">
+                Pricing offers
+              </p>
+              <p className="mt-1 text-base font-semibold text-white">
+                Free trial + first-payment discount per tier
+              </p>
+              <p className="mt-1 text-sm text-white/65">
+                Toggle a free trial and / or a first-payment discount on
+                Silver and Gold independently. Each can target first-time
+                subscribers, everyone, or a specific country, with optional
+                start / end dates.
+              </p>
+              <div className="mt-2">
+                <DocLink
+                  href="https://developer.apple.com/app-store/subscriptions/"
+                  label="App Store intro offers"
+                  inline
+                />
+              </div>
+            </div>
+            <Sparkles className="h-6 w-6 flex-shrink-0 text-accent-purple" />
+          </div>
+
+          <PricingOffersForm initial={offers} />
         </GlassCard>
 
         {/* Region cheatsheet ----------------------------------------------*/}

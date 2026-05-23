@@ -206,6 +206,15 @@ export async function generateMealPlan(
     position += 1;
   }
 
+  // ---- 7. Bump the denormalized daily counter ---------------------------
+  // The authoritative AI cap check reads from `ai_generations` (above).
+  // We mirror the count into `user_daily_quotas` so the mobile-facing
+  // /api/quotas endpoint can return both AI and shuffle counters from
+  // the same row without joining two tables on every poll.
+  await sb
+    .rpc("bump_quota", { p_user_id: req.user_id, p_kind: "ai" })
+    .then(() => undefined, () => undefined);
+
   return {
     ok: true,
     plan_id: planId,

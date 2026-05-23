@@ -41,9 +41,9 @@ Configured per the product spec:
 
 | Tier | Rule |
 |---|---|
-| **Free** | 3 immediate, then 1 per 30 min, daily cap **20** |
-| **Silver** | Daily cap **50** |
-| **Gold** | Daily cap **100** |
+| **Free** | 1 AI generation / day, 10 shuffles / day. Tunable in `app_settings`. |
+| **Silver** | 20 AI generations / day, unlimited shuffles. Tunable in `app_settings`. |
+| **Gold** | 30 AI generations / day, unlimited shuffles. Tunable in `app_settings`. |
 
 `check_ai_rate_limit(user_id, kind)` returns `(allowed, reason, retry_after_seconds, daily_used, daily_limit)` so the API can return a clean 429 with a retry hint. Rows where `cache_hit = true` don't count toward the limit, since no AI call actually happened.
 

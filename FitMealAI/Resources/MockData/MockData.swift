@@ -134,17 +134,17 @@ enum MockData {
         SubscriptionPlan(
             tier: .free,
             pricePerMonth: "$0",
-            features: ["Daily meal & workout plan", "Basic habit tracker", "Limited regenerations"]
+            features: ["1 AI meal plan / day", "10 catalog shuffles / day", "Daily plan + habit tracker"]
         ),
         SubscriptionPlan(
             tier: .silver,
             pricePerMonth: "$4.99",
-            features: ["Unlimited regenerations", "Weekly meal plans", "Workout variations"]
+            features: ["20 AI generations / day", "Unlimited catalog shuffles", "Weekly meal plans", "Workout variations"]
         ),
         SubscriptionPlan(
             tier: .gold,
             pricePerMonth: "$9.99",
-            features: ["Everything in Silver", "Advanced progress analytics", "Priority AI coaching"],
+            features: ["30 AI generations / day", "Unlimited catalog shuffles", "Advanced progress analytics", "Priority AI coaching"],
             isHighlighted: true
         )
     ]

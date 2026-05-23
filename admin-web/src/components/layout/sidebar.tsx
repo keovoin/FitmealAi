@@ -3,7 +3,9 @@
 import { cn } from "@/lib/cn";
 import {
   Bell,
+  ChefHat,
   CreditCard,
+  Gauge,
   LayoutDashboard,
   Leaf,
   Settings,
@@ -24,6 +26,8 @@ const NAV = [
   { href: "/payments", label: "Payments", icon: Wallet, badgeKey: "pendingPayments" as const },
   { href: "/users", label: "Users", icon: Users },
   { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/recipes", label: "Recipes", icon: ChefHat },
+  { href: "/quotas", label: "Quotas", icon: Gauge },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/referrals", label: "Referrals", icon: Share2 },
   { href: "/settings", label: "Settings", icon: Settings },

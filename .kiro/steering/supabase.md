@@ -25,9 +25,9 @@ Lives in `check_ai_rate_limit(user_id, kind)` in migration 0008.
 
 | Tier | Behavior |
 |---|---|
-| Free | 3 immediate, then 1 every 30 min, daily cap 20 |
-| Silver | 50/day |
-| Gold | 100/day |
+| Free | 1 AI generation / day, 10 catalog shuffles / day (admin-tunable) |
+| Silver | 20 AI generations / day, unlimited shuffles (admin-tunable) |
+| Gold | 30 AI generations / day, unlimited shuffles (admin-tunable) |
 
 Rows where `cache_hit = true` do NOT count against these caps because no AI call actually happened.
 

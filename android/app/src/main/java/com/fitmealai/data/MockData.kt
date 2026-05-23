@@ -114,7 +114,8 @@ object MockData {
             priceLabel = "$0",
             tagline = "The basics, free forever",
             perks = listOf(
-                "3 AI meal generations",
+                "1 AI meal plan / day",
+                "10 catalog shuffles / day",
                 "Today's plan only",
                 "Habit tracker",
             ),
@@ -122,9 +123,10 @@ object MockData {
         SubscriptionPlan(
             tier = SubscriptionTier.Silver,
             priceLabel = "$4.99 / mo",
-            tagline = "Unlimited daily plans",
+            tagline = "Plenty of fresh plans every day",
             perks = listOf(
-                "50 AI generations / day",
+                "20 AI generations / day",
+                "Unlimited catalog shuffles",
                 "Tomorrow's plan",
                 "Workout timer",
                 "Saved preferences",
@@ -136,7 +138,8 @@ object MockData {
             priceLabel = "$9.99 / mo",
             tagline = "Coach-grade plans",
             perks = listOf(
-                "100 AI generations / day",
+                "30 AI generations / day",
+                "Unlimited catalog shuffles",
                 "Weekly meal plans",
                 "Advanced progress charts",
                 "Priority regeneration",
