@@ -1,6 +1,11 @@
 import "server-only";
 import { z } from "zod";
-import { getOpenAI, getTextModel, getImageModel, getDailyBudget } from "./openai";
+import {
+  AIProviderConfigError,
+  getDailyBudget,
+  resolveActiveAIProvider,
+  type ResolvedAIProvider,
+} from "./openai";
 import { buildImagePrompt } from "./prompts";
 import { imageCallCostMicro, textCallCostMicro } from "./cost";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -118,9 +123,25 @@ export async function generateRecipeForAdmin(
     };
   }
 
-  // 2. Text generation.
-  const openai = getOpenAI();
-  const textModel = getTextModel();
+  // 2. Resolve the admin-selected provider (OpenAI cloud vs custom
+  //    OpenAI-compatible endpoint). Re-resolved per request so flipping
+  //    /ai-settings takes effect immediately. Throws if the active
+  //    provider's env vars aren't set; surface that as a clean 503.
+  let provider: ResolvedAIProvider;
+  try {
+    provider = await resolveActiveAIProvider();
+  } catch (err) {
+    if (err instanceof AIProviderConfigError) {
+      return { ok: false, status: 503, error: err.message };
+    }
+    return {
+      ok: false,
+      status: 500,
+      error: "AI provider could not be resolved.",
+    };
+  }
+  const openai = provider.client;
+  const textModel = provider.textModel;
   const warnings: string[] = [];
 
   let textCompletion;
@@ -136,10 +157,12 @@ export async function generateRecipeForAdmin(
     });
   } catch (err) {
     await logFailure(opts.adminUserId, "meal_plan", textModel, errorCode(err));
+    const providerLabel =
+      provider.id === "custom" ? "Custom AI endpoint" : "OpenAI";
     return {
       ok: false,
       status: 502,
-      error: "OpenAI text request failed. Try again or check the API key.",
+      error: `${providerLabel} text request failed (${errorCode(err)}). Check the endpoint and API key in Vercel env vars.`,
     };
   }
 
@@ -181,17 +204,25 @@ export async function generateRecipeForAdmin(
   });
 
   // 4. Optional hero image. Best-effort: a failed image doesn't kill
-  //    the recipe — we just surface a warning.
+  //    the recipe — we just surface a warning. Skip silently when the
+  //    active provider is custom and CUSTOM_AI_IMAGE_MODEL was left
+  //    blank (most self-hosted endpoints don't expose images.generate).
   let imageUrl: string | null = null;
   if (opts.withImage) {
-    try {
-      imageUrl = await generateAndUploadImage(parsed, opts.adminUserId);
-    } catch (err) {
-      const detail =
-        err instanceof Error ? err.message.slice(0, 200) : "unknown";
+    if (!provider.supportsImages) {
       warnings.push(
-        `Hero image generation failed (${detail}). The recipe was generated; you can upload an image manually.`,
+        `Image generation skipped — active AI provider (${provider.id}) has no image model configured. Upload a hero image manually.`,
       );
+    } else {
+      try {
+        imageUrl = await generateAndUploadImage(parsed, provider, opts.adminUserId);
+      } catch (err) {
+        const detail =
+          err instanceof Error ? err.message.slice(0, 200) : "unknown";
+        warnings.push(
+          `Hero image generation failed (${detail}). The recipe was generated; you can upload an image manually.`,
+        );
+      }
     }
   }
 
@@ -247,10 +278,13 @@ function buildUserPrompt(opts: GenerateRecipeOptions): string {
 
 async function generateAndUploadImage(
   recipe: GeneratedRecipe,
+  provider: ResolvedAIProvider,
   adminUserId?: string,
 ): Promise<string | null> {
-  const openai = getOpenAI();
-  const imageModel = getImageModel();
+  // Caller already checked provider.supportsImages, but assert for safety.
+  if (!provider.imageModel) return null;
+  const openai = provider.client;
+  const imageModel = provider.imageModel;
   const prompt = buildImagePrompt(recipe.image_prompt, recipe.title);
 
   const resp = await openai.images.generate({
