@@ -81,7 +81,7 @@ export default function PaywallPage() {
 
   async function handleSubscribe() {
     if (selected === "free") {
-      router.push("/home");
+      router.push("/app/home");
       return;
     }
     setProcessing(true);
@@ -89,7 +89,7 @@ export default function PaywallPage() {
     // For now, we simulate the subscription
     setTimeout(() => {
       setProcessing(false);
-      router.push("/home");
+      router.push("/app/home");
     }, 2000);
   }
 

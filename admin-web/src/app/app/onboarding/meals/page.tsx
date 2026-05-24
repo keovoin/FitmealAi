@@ -112,7 +112,7 @@ export default function OnboardingMealsPage() {
       localStorage.removeItem("onboarding_goal");
       localStorage.removeItem("onboarding_workout");
 
-      router.replace("/home");
+      router.replace("/app/home");
     } catch (err) {
       console.error("Failed to save onboarding:", err);
     } finally {

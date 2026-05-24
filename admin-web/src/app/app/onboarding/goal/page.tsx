@@ -36,7 +36,7 @@ export default function OnboardingGoalPage() {
   function handleContinue() {
     if (!selected) return;
     localStorage.setItem("onboarding_goal", selected);
-    router.push("/onboarding/workout");
+    router.push("/app/onboarding/workout");
   }
 
   return (

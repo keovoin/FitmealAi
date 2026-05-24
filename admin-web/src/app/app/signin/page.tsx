@@ -46,9 +46,9 @@ export default function LoginPage() {
           .limit(1);
 
         if (!goals || goals.length === 0) {
-          router.replace("/onboarding/goal");
+          router.replace("/app/onboarding/goal");
         } else {
-          router.replace("/home");
+          router.replace("/app/home");
         }
       }
     } catch (err: unknown) {

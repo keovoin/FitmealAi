@@ -67,9 +67,9 @@ function BottomNav() {
   const pathname = usePathname();
 
   const tabs = [
-    { href: "/home", label: "Home", Icon: HomeIcon },
-    { href: "/meals", label: "Meals", Icon: MealsIcon },
-    { href: "/settings", label: "Settings", Icon: SettingsIcon },
+    { href: "/app/home", label: "Home", Icon: HomeIcon },
+    { href: "/app/meals", label: "Meals", Icon: MealsIcon },
+    { href: "/app/settings", label: "Settings", Icon: SettingsIcon },
   ];
 
   return (
@@ -105,12 +105,12 @@ function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const publicPaths = ["/signin"];
+  const publicPaths = ["/app/signin"];
   const isPublic = publicPaths.some((p) => pathname?.startsWith(p));
 
   useEffect(() => {
     if (!loading && !user && !isPublic) {
-      router.replace("/signin");
+      router.replace("/app/signin");
     }
   }, [loading, user, isPublic, router]);
 
@@ -131,7 +131,7 @@ function AuthGuard({ children }: { children: ReactNode }) {
 export default function UserLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const hideNav =
-    pathname?.startsWith("/signin") || pathname?.startsWith("/onboarding");
+    pathname?.startsWith("/app/signin") || pathname?.startsWith("/app/onboarding");
 
   return (
     <>

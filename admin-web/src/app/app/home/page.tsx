@@ -97,7 +97,7 @@ function MealsSummaryCard({ meals }: { meals: MealSummary[] }) {
 
   return (
     <button
-      onClick={() => router.push("/meals")}
+      onClick={() => router.push("/app/meals")}
       className="glass-card w-full p-5 text-left transition-colors hover:bg-white/[0.08]"
     >
       <h3 className="mb-3 text-sm font-medium text-white/70">
@@ -129,7 +129,7 @@ function UpgradeBanner() {
   const router = useRouter();
   return (
     <button
-      onClick={() => router.push("/paywall")}
+      onClick={() => router.push("/app/paywall")}
       className="w-full rounded-card border border-gold-start/40 bg-gradient-to-r from-gold-start/10 to-gold-end/10 p-4 text-left transition-colors hover:from-gold-start/15 hover:to-gold-end/15"
     >
       <div className="flex items-center gap-3">

@@ -83,7 +83,7 @@ export default function OnboardingWorkoutPage() {
         duration,
       }),
     );
-    router.push("/onboarding/meals");
+    router.push("/app/onboarding/meals");
   }
 
   return (

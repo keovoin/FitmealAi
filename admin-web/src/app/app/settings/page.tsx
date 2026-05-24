@@ -64,7 +64,7 @@ export default function SettingsPage() {
   async function handleSignOut() {
     setSigningOut(true);
     await signOut();
-    router.replace("/signin");
+    router.replace("/app/signin");
   }
 
   const initials =
@@ -105,7 +105,7 @@ export default function SettingsPage() {
           </div>
           {tier === "free" && (
             <button
-              onClick={() => router.push("/paywall")}
+              onClick={() => router.push("/app/paywall")}
               className="rounded-full bg-gold-gradient px-4 py-1.5 text-xs font-semibold text-slate-900"
             >
               Upgrade
