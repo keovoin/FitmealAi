@@ -130,13 +130,28 @@ export function parseWithEnvelope<T>(
       }
     }
 
-    // Deep-dive: try every value in the object that is itself an object
-    for (const key of Object.keys(record)) {
-      const val = record[key];
-      if (val && typeof val === "object" && !Array.isArray(val)) {
-        const peeled = schema.safeParse(val);
-        if (peeled.success) return peeled.data;
+    // Deep-dive: BFS through all nested objects up to depth 3
+    const queue: unknown[] = Object.values(record);
+    let depth = 0;
+    while (queue.length > 0 && depth < 3) {
+      const batch = queue.splice(0, queue.length);
+      for (const val of batch) {
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+          const peeled = schema.safeParse(val);
+          if (peeled.success) return peeled.data;
+          // Add children to queue for next depth level
+          queue.push(...Object.values(val as Record<string, unknown>));
+        }
+        if (Array.isArray(val) && val.length > 0) {
+          const peeled = schema.safeParse(val[0]);
+          if (peeled.success) return peeled.data;
+          // Also search inside first array element
+          if (val[0] && typeof val[0] === "object") {
+            queue.push(val[0]);
+          }
+        }
       }
+      depth++;
     }
   }
 

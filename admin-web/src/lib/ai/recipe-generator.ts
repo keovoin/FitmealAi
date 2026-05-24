@@ -254,10 +254,14 @@ export async function generateRecipeForAdmin(
     );
     const detail =
       err instanceof Error ? err.message.slice(0, 120) : "unknown";
+    // Include a snippet of the raw response so the admin can see what
+    // the model actually returned (helps debug Kiro/Custom responses).
+    const rawSnippet = raw.slice(0, 300);
+    console.error("[recipe-generator] schema_invalid. Raw AI response:", rawSnippet);
     return {
       ok: false,
       status: 502,
-      error: `OpenAI returned a recipe that didn't match the expected JSON shape (${detail}).`,
+      error: `AI returned invalid JSON (${detail}). Raw preview: ${rawSnippet.slice(0, 150)}...`,
     };
   }
 
