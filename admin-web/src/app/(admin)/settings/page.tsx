@@ -5,7 +5,7 @@ import { isAIConfigured } from "@/lib/ai/openai";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { MobileConfigPanel } from "./mobile-config-panel";
 import { DocLink } from "@/components/ui/doc-link";
-import { Banknote, Stethoscope } from "lucide-react";
+import { Banknote, Bell, Stethoscope } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminSettingsPage() {
@@ -130,26 +130,24 @@ export default function AdminSettingsPage() {
             AI meal generation
           </p>
           <p className="mt-1 text-base font-semibold text-white">
-            {aiOn ? "OpenAI connected" : "OpenAI not connected"}
+            {aiOn ? "AI provider connected" : "AI not connected"}
           </p>
           <p className="mt-2 text-sm text-white/65">
             {aiOn
-              ? "POST /api/ai/meal-plan generates structured meals, dedupes by title slug, and caches images in the meal-images bucket."
-              : "Set OPENAI_API_KEY in Vercel env vars to enable meal generation."}
+              ? "POST /api/ai/meal-plan generates structured meals, dedupes by title slug, and caches images in the meal-images bucket. Configure the active provider in AI settings."
+              : "Set OPENAI_API_KEY (or KIRO_AI_* / CUSTOM_AI_* env vars) in Vercel to enable meal generation."}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={aiOn ? "green" : "outline"}>
               {aiOn ? "Connected" : "Not configured"}
             </Badge>
             <Badge tone="blue">Rate-limited per tier</Badge>
-            <DocLink
-              href="https://platform.openai.com/api-keys"
-              label="Create OpenAI API key"
-            />
-            <DocLink
-              href="https://platform.openai.com/usage"
-              label="Usage dashboard"
-            />
+            <Link
+              href="/ai-settings"
+              className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+            >
+              AI provider settings
+            </Link>
           </div>
         </GlassCard>
 
@@ -181,22 +179,20 @@ export default function AdminSettingsPage() {
             Notifications
           </p>
           <p className="mt-1 text-base font-semibold text-white">
-            Push & in-app messages
+            Push & Telegram messages
           </p>
           <p className="mt-2 text-sm text-white/65">
-            Coming with the iOS auth wiring. Approval triggers do not yet
-            push a notification to the user&apos;s device.
+            Manage push providers (FCM, APNs), Telegram bot integration,
+            and customize notification templates from the dedicated page.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge tone="outline">Planned</Badge>
-            <DocLink
-              href="https://developer.apple.com/documentation/usernotifications"
-              label="Apple Push Notifications"
-            />
-            <DocLink
-              href="https://firebase.google.com/docs/cloud-messaging"
-              label="Firebase Cloud Messaging"
-            />
+            <Link
+              href="/notifications"
+              className="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/[0.14] hover:text-white"
+            >
+              <Bell className="h-3 w-3" />
+              Open notifications
+            </Link>
           </div>
         </GlassCard>
       </div>

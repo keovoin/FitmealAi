@@ -5,6 +5,7 @@ import { getPendingPaymentsCount } from "@/lib/supabase/admin-queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { MobileNav } from "@/components/layout/mobile-nav";
 
 /**
  * Protected layout for every admin page. Lives in the `(admin)` route
@@ -30,7 +31,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <div className="flex min-h-screen">
       <Sidebar pendingPayments={pendingPayments} />
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 pb-16 lg:pb-0">{children}</div>
+      <MobileNav pendingPayments={pendingPayments} />
     </div>
   );
 }

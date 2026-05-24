@@ -178,7 +178,7 @@ export default async function SetupHealthPage() {
                       </code>{" "}
                       through{" "}
                       <code className="rounded bg-black/30 px-1 py-0.5 text-[11px]">
-                        0013_app_settings.sql
+                        0018_ai_provider_setting.sql
                       </code>
                       , in order.
                     </li>

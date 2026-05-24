@@ -92,7 +92,7 @@ export function Sidebar({ pendingPayments }: { pendingPayments: number }) {
       </nav>
 
       <div className="mt-auto rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/55">
-        v0.1.0 . Phase 3 admin
+        v1.0.0 . Phase 5 admin
       </div>
     </aside>
   );
