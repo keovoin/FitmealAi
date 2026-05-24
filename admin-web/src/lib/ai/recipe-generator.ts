@@ -124,6 +124,7 @@ function normalizeRecipeFields(obj: unknown): unknown {
   const result: Record<string, unknown> = { ...r };
 
   // Recipe-level aliases
+  if (!result.title && result.name) result.title = result.name;
   if (!result.meal_type && result.mealType) result.meal_type = result.mealType;
   if (!result.cook_time_minutes && result.cookTime) {
     const n = parseInt(String(result.cookTime), 10);
