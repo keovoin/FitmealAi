@@ -1,8 +1,10 @@
 import "server-only";
+import type OpenAI from "openai";
 import { z } from "zod";
 import {
   AIProviderConfigError,
   getDailyBudget,
+  getImageFallbackClient,
   resolveActiveAIProvider,
   type ResolvedAIProvider,
 } from "./openai";
@@ -213,15 +215,30 @@ export async function generateRecipeForAdmin(
   });
 
   // 4. Optional hero image. Best-effort: a failed image doesn't kill
-  //    the recipe — we just surface a warning. Skip silently when the
-  //    active provider is custom and CUSTOM_AI_IMAGE_MODEL was left
-  //    blank (most self-hosted endpoints don't expose images.generate).
+  //    the recipe — we just surface a warning. When the active provider
+  //    doesn't support images, fall back to OpenAI cloud if available.
   let imageUrl: string | null = null;
   if (opts.withImage) {
     if (!provider.supportsImages) {
-      warnings.push(
-        `Image generation skipped — active AI provider (${provider.id}) has no image model configured. Upload a hero image manually.`,
-      );
+      // Active provider has no image model — try OpenAI fallback.
+      const fallback = getImageFallbackClient(provider.id);
+      if (fallback) {
+        try {
+          imageUrl = await generateAndUploadImageWithFallback(
+            parsed, fallback.client, fallback.imageModel, opts.adminUserId,
+          );
+        } catch (err) {
+          const detail =
+            err instanceof Error ? err.message.slice(0, 200) : "unknown";
+          warnings.push(
+            `Hero image generation failed via OpenAI fallback (${detail}). The recipe was generated; you can upload an image manually.`,
+          );
+        }
+      } else {
+        warnings.push(
+          `Image generation skipped — active AI provider (${provider.id}) has no image model configured and OPENAI_API_KEY is not set for fallback. Upload a hero image manually.`,
+        );
+      }
     } else {
       try {
         imageUrl = await generateAndUploadImage(parsed, provider, opts.adminUserId);
@@ -292,11 +309,79 @@ async function generateAndUploadImage(
 ): Promise<string | null> {
   // Caller already checked provider.supportsImages, but assert for safety.
   if (!provider.imageModel) return null;
-  const openai = provider.client;
-  const imageModel = provider.imageModel;
   const prompt = buildImagePrompt(recipe.image_prompt, recipe.title);
 
-  const resp = await openai.images.generate({
+  // Try the active provider first. If it fails (e.g. Kiro/Custom doesn't
+  // support /images/generations), fall back to the OpenAI cloud when
+  // OPENAI_API_KEY is available.
+  let b64: string | undefined;
+  let usedModel = provider.imageModel;
+
+  try {
+    const resp = await provider.client.images.generate({
+      model: provider.imageModel,
+      prompt,
+      n: 1,
+      size: "1024x1024",
+      response_format: "b64_json",
+    });
+    b64 = resp.data?.[0]?.b64_json ?? undefined;
+  } catch (primaryErr) {
+    // Attempt OpenAI fallback when the active provider isn't already OpenAI.
+    const fallback = getImageFallbackClient(provider.id);
+    if (fallback) {
+      const resp = await fallback.client.images.generate({
+        model: fallback.imageModel,
+        prompt,
+        n: 1,
+        size: "1024x1024",
+        response_format: "b64_json",
+      });
+      b64 = resp.data?.[0]?.b64_json ?? undefined;
+      usedModel = fallback.imageModel;
+    } else {
+      // No fallback available — re-throw the original error so the
+      // caller surfaces the warning to the admin.
+      throw primaryErr;
+    }
+  }
+
+  if (!b64) {
+    await logFailure(adminUserId, "meal_image", usedModel, "no_b64");
+    return null;
+  }
+
+  const buffer = Buffer.from(b64, "base64");
+  const uploaded = await uploadRecipeImage({
+    buffer,
+    contentType: "image/png",
+    slug: slugifyTitle(recipe.title),
+  });
+
+  await logSuccess({
+    userId: adminUserId,
+    kind: "meal_image",
+    model: usedModel,
+    costUsdMicro: imageCallCostMicro(usedModel),
+  });
+
+  return uploaded.url;
+}
+
+/**
+ * Generate + upload an image using a specific client + model directly
+ * (no primary attempt). Used when the active provider has no image
+ * support at all and we go straight to the OpenAI fallback.
+ */
+async function generateAndUploadImageWithFallback(
+  recipe: GeneratedRecipe,
+  client: OpenAI,
+  imageModel: string,
+  adminUserId?: string,
+): Promise<string | null> {
+  const prompt = buildImagePrompt(recipe.image_prompt, recipe.title);
+
+  const resp = await client.images.generate({
     model: imageModel,
     prompt,
     n: 1,

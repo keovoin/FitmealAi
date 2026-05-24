@@ -236,6 +236,38 @@ function hasKiroEnv(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Image-generation fallback
+//
+// When the active provider is Kiro or Custom and its image call fails
+// (e.g. the endpoint doesn't support /images/generations), we can fall
+// back to the OpenAI cloud — provided OPENAI_API_KEY is set. This
+// keeps the admin's text flow on Kiro/Custom while still getting hero
+// images from OpenAI's gpt-image-1.
+// ---------------------------------------------------------------------------
+
+export interface ImageFallbackClient {
+  client: OpenAI;
+  imageModel: string;
+}
+
+/**
+ * Returns an OpenAI-cloud image client when the active provider is NOT
+ * OpenAI and `OPENAI_API_KEY` is available. Returns `null` otherwise
+ * (meaning no fallback is possible).
+ */
+export function getImageFallbackClient(
+  activeProviderId: AIProviderId,
+): ImageFallbackClient | null {
+  if (activeProviderId === "openai") return null; // already using OpenAI
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) return null;
+  return {
+    client: new OpenAI({ apiKey }),
+    imageModel: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Backwards-compat shims
 //
 // A handful of older callers still expect the old sync getters. They
