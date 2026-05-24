@@ -145,7 +145,7 @@ export default async function PaymentSettingsPage() {
         </GlassCard>
 
         {/* Store billing -------------------------------------------------*/}
-        <GlassCard data-testid="storekit-card">
+        <GlassCard data-testid="storekit-card" className="lg:col-span-2">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wider text-white/50">
