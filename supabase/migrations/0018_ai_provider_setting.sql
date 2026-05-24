@@ -15,6 +15,6 @@ insert into public.app_settings(key, value, description) values
   (
     'ai_provider.text',
     '"openai"'::jsonb,
-    'Which provider serves /api/ai/meal-plan and admin "Generate with AI" requests. One of "openai" or "custom". The custom endpoint must be OpenAI-compatible (chat/completions, optional images/generations) and is configured through the CUSTOM_AI_* env vars.'
+    'Which provider serves /api/ai/meal-plan and admin "Generate with AI" requests. One of "openai", "custom", or "kiro". The custom endpoint must be OpenAI-compatible (chat/completions, optional images/generations) and is configured through the CUSTOM_AI_* env vars. Kiro AI is configured through the KIRO_AI_* env vars.'
   )
 on conflict (key) do nothing;

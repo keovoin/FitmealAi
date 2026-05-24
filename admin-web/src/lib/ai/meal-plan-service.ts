@@ -1,8 +1,10 @@
 import "server-only";
+import type OpenAI from "openai";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import {
   AIProviderConfigError,
   getDailyBudget,
+  getImageFallbackClient,
   resolveActiveAIProvider,
   type ResolvedAIProvider,
 } from "./openai";
@@ -438,16 +440,110 @@ async function generateAndStoreImage(
   // meal text still goes out, the image_url stays null, and the
   // mobile app's GlassCard renders a placeholder.
   if (!provider.supportsImages || !provider.imageModel) {
+    // Even when the active provider has no image support, try the
+    // OpenAI fallback if OPENAI_API_KEY is set.
+    const fallback = getImageFallbackClient(provider.id);
+    if (!fallback) return null;
+    return generateImageWithClient(
+      userId, mealId, meal, fallback.client, fallback.imageModel,
+    );
+  }
+
+  const sb = getSupabaseAdmin();
+  const prompt = buildImagePrompt(meal.image_prompt, meal.title);
+
+  let b64: string | undefined;
+  let usedModel = provider.imageModel;
+
+  try {
+    const imageResp = await provider.client.images.generate({
+      model: provider.imageModel,
+      prompt,
+      n: 1,
+      size: "1024x1024",
+      response_format: "b64_json",
+    });
+    b64 = imageResp.data?.[0]?.b64_json ?? undefined;
+  } catch (primaryErr) {
+    // Attempt OpenAI fallback when the active provider isn't OpenAI.
+    const fallback = getImageFallbackClient(provider.id);
+    if (fallback) {
+      try {
+        const imageResp = await fallback.client.images.generate({
+          model: fallback.imageModel,
+          prompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "b64_json",
+        });
+        b64 = imageResp.data?.[0]?.b64_json ?? undefined;
+        usedModel = fallback.imageModel;
+      } catch (fallbackErr) {
+        await logFailedGeneration(userId, "meal_image", usedModel, errorCode(fallbackErr), mealId);
+        return null;
+      }
+    } else {
+      await logFailedGeneration(userId, "meal_image", usedModel, errorCode(primaryErr), mealId);
+      return null;
+    }
+  }
+
+  if (!b64) {
+    await logFailedGeneration(userId, "meal_image", usedModel, "no_b64", mealId);
     return null;
   }
+
+  const buffer = Buffer.from(b64, "base64");
+  const objectPath = `${mealId}.png`;
+  const { error: uploadErr } = await sb.storage
+    .from("meal-images")
+    .upload(objectPath, buffer, {
+      contentType: "image/png",
+      upsert: true,
+    });
+  if (uploadErr) {
+    await logFailedGeneration(userId, "meal_image", usedModel, "storage_upload_failed", mealId);
+    return null;
+  }
+
+  const { data: publicUrl } = sb.storage.from("meal-images").getPublicUrl(objectPath);
+  const url = publicUrl?.publicUrl ?? null;
+
+  await sb
+    .from("meals")
+    .update({ image_storage_path: objectPath, image_url: url })
+    .eq("id", mealId);
+
+  await sb.from("ai_generations").insert({
+    user_id: userId,
+    kind: "meal_image",
+    meal_id: mealId,
+    model: usedModel,
+    cost_usd_micro: imageCallCostMicro(usedModel),
+    cache_hit: false,
+    succeeded: true,
+  });
+
+  return url;
+}
+
+/**
+ * Helper: generate an image using a specific client+model (used for
+ * the OpenAI fallback path when the primary provider has no image support).
+ */
+async function generateImageWithClient(
+  userId: string,
+  mealId: string,
+  meal: GeneratedMeal,
+  client: OpenAI,
+  imageModel: string,
+): Promise<string | null> {
   const sb = getSupabaseAdmin();
-  const openai = provider.client;
-  const imageModel = provider.imageModel;
   const prompt = buildImagePrompt(meal.image_prompt, meal.title);
 
   let imageResp;
   try {
-    imageResp = await openai.images.generate({
+    imageResp = await client.images.generate({
       model: imageModel,
       prompt,
       n: 1,
@@ -458,6 +554,7 @@ async function generateAndStoreImage(
     await logFailedGeneration(userId, "meal_image", imageModel, errorCode(err), mealId);
     return null;
   }
+
   const b64 = imageResp.data?.[0]?.b64_json;
   if (!b64) {
     await logFailedGeneration(userId, "meal_image", imageModel, "no_b64", mealId);
