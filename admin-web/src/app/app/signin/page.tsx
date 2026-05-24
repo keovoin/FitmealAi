@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
 
@@ -17,6 +18,7 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     try {
@@ -26,46 +28,87 @@ export default function LoginPage() {
           password,
         });
         if (err) throw err;
+
+        // Login succeeded — check onboarding
+        await navigateAfterAuth();
       } else {
-        const { error: err } = await supabase.auth.signUp({
+        // Sign up — Supabase may require email confirmation
+        const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            // Skip email confirmation for development. In production,
+            // Supabase project settings control whether confirmation is
+            // required. Either way we handle both states below.
+            emailRedirectTo: `${window.location.origin}/app/onboarding/goal`,
+          },
         });
         if (err) throw err;
-      }
 
-      // Check if user has completed onboarding
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data: goals } = await supabase
-          .from("user_goals")
-          .select("id")
-          .eq("user_id", user.id)
-          .limit(1);
-
-        if (!goals || goals.length === 0) {
-          router.replace("/app/onboarding/goal");
+        // Check if the user's session was immediately created (no email
+        // confirmation required) or if they need to verify their email.
+        if (data.session) {
+          // Immediate session — navigate to onboarding
+          await navigateAfterAuth();
+        } else if (data.user && !data.session) {
+          // Email confirmation required
+          setSuccess(
+            "Account created! Check your email for a confirmation link, then come back and sign in.",
+          );
+          setMode("login");
         } else {
-          router.replace("/app/home");
+          // Fallback
+          setSuccess("Account created! You can now sign in.");
+          setMode("login");
         }
       }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
+      // Make common errors more user-friendly
+      if (message.includes("Invalid login credentials")) {
+        setError("Incorrect email or password. Try again or create an account.");
+      } else if (message.includes("already registered")) {
+        setError("This email already has an account. Try signing in instead.");
+        setMode("login");
+      } else if (message.includes("rate limit") || message.includes("security purposes")) {
+        setError("Too many attempts. Please wait a minute and try again.");
+      } else if (message.includes("Password should be")) {
+        setError("Password must be at least 6 characters.");
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
   }
 
+  async function navigateAfterAuth() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: goals } = await supabase
+        .from("user_goals")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (!goals || goals.length === 0) {
+        router.replace("/app/onboarding/goal");
+      } else {
+        router.replace("/app/home");
+      }
+    }
+  }
+
   async function handleGoogleLogin() {
     setError(null);
+    setSuccess(null);
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/home`,
+        redirectTo: `${window.location.origin}/app/home`,
       },
     });
     if (err) setError(err.message);
@@ -111,7 +154,7 @@ export default function LoginPage() {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password (min 6 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="glass-input py-3"
@@ -120,15 +163,21 @@ export default function LoginPage() {
           />
 
           {error && (
-            <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+            <p className="rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-sm text-danger">
               {error}
+            </p>
+          )}
+
+          {success && (
+            <p className="rounded-lg bg-success/10 border border-success/30 px-3 py-2 text-sm text-success">
+              {success}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-primary-gradient py-3 font-semibold text-white shadow-glow transition-opacity disabled:opacity-50"
+            disabled={loading || !email || password.length < 6}
+            className="w-full rounded-xl bg-primary-gradient py-3 font-semibold text-white shadow-glow transition-all disabled:opacity-50 active:scale-[0.97]"
           >
             {loading
               ? "Loading..."
@@ -182,6 +231,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setMode("signup");
                   setError(null);
+                  setSuccess(null);
                 }}
                 className="font-medium text-accent-purple hover:underline"
               >
@@ -195,6 +245,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setMode("login");
                   setError(null);
+                  setSuccess(null);
                 }}
                 className="font-medium text-accent-purple hover:underline"
               >
@@ -204,6 +255,11 @@ export default function LoginPage() {
           )}
         </p>
       </div>
+
+      {/* Footer */}
+      <p className="mt-6 text-center text-xs text-white/35">
+        By continuing you agree to our Terms and Privacy Policy.
+      </p>
     </div>
   );
 }
