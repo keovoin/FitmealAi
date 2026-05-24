@@ -54,7 +54,6 @@ interface ReferralCodeRow {
   user_id: string;
   code: string;
   created_at: string;
-  profiles: ProfileLite | null;
 }
 
 interface ReferralRow {
@@ -79,16 +78,28 @@ function userLabel(profile: ProfileLite | null | undefined, fallbackId: string):
 export async function listReferralCodes(): Promise<AdminReferralCode[]> {
   const sb = getSupabaseAdmin();
 
-  // Codes joined with profile.
+  // referral_codes.user_id references auth.users (not public.profiles),
+  // so PostgREST cannot auto-join. Fetch codes first, then resolve
+  // profile names in a separate query.
   const { data: codes, error } = await sb
     .from("referral_codes")
-    .select(
-      `id,user_id,code,created_at,
-       profiles ( display_name, email )`,
-    )
+    .select("id,user_id,code,created_at")
     .order("created_at", { ascending: false })
     .limit(500);
   if (error) throw new Error(`listReferralCodes: ${error.message}`);
+
+  // Batch-fetch profiles for all code owners.
+  const userIds = [...new Set((codes ?? []).map((c: { user_id: string }) => c.user_id))];
+  const profileMap = new Map<string, ProfileLite>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await sb
+      .from("profiles")
+      .select("id,display_name,email")
+      .in("id", userIds);
+    for (const p of (profiles ?? []) as { id: string; display_name: string | null; email: string }[]) {
+      profileMap.set(p.id, { display_name: p.display_name, email: p.email });
+    }
+  }
 
   // All referrals so we can compute counts in-memory (fewer queries than
   // 3 RPCs per code; the table will be small for a long time).
@@ -108,11 +119,12 @@ export async function listReferralCodes(): Promise<AdminReferralCode[]> {
 
   return ((codes ?? []) as unknown as ReferralCodeRow[]).map((row) => {
     const c = counts.get(row.user_id) ?? { pending: 0, verified: 0, rewarded: 0 };
+    const profile = profileMap.get(row.user_id) ?? null;
     return {
       id: row.id,
       userId: row.user_id,
-      userName: userLabel(row.profiles, row.user_id),
-      userEmail: row.profiles?.email ?? "",
+      userName: userLabel(profile, row.user_id),
+      userEmail: profile?.email ?? "",
       code: row.code,
       createdAt: row.created_at,
       pending: c.pending,

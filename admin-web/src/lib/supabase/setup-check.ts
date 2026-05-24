@@ -54,7 +54,7 @@ const REQUIRED_TABLES = [
  *
  * Update this whenever you add a new `NNNN_*.sql` migration.
  */
-export const LATEST_MIGRATION_NUMBER = 16;
+export const LATEST_MIGRATION_NUMBER = 18;
 
 export type RequiredTable = (typeof REQUIRED_TABLES)[number];
 
