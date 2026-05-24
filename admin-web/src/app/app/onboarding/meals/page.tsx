@@ -82,26 +82,35 @@ export default function OnboardingMealsPage() {
       const workoutRaw = localStorage.getItem("onboarding_workout");
       const workout = workoutRaw
         ? JSON.parse(workoutRaw)
-        : { types: [], days: "3 days", duration: "30 min" };
+        : { types: ["strength"], days: "4 days", duration: "45 min" };
 
-      // Save user_goals
+      // Save to user_goals table (PK: user_id)
       await supabase.from("user_goals").upsert(
         {
           user_id: user.id,
-          goal,
-          workout_types: workout.types,
-          workout_days: workout.days,
-          workout_duration: workout.duration,
+          fitness_goal: goal,
+          daily_calorie_target: 2000,
         },
         { onConflict: "user_id" },
       );
 
-      // Save meal_prefs
+      // Save to workout_prefs table (PK: user_id)
+      await supabase.from("workout_prefs").upsert(
+        {
+          user_id: user.id,
+          types: workout.types,
+          days: workout.days,
+          duration: workout.duration,
+        },
+        { onConflict: "user_id" },
+      );
+
+      // Save to meal_prefs table (PK: user_id)
       await supabase.from("meal_prefs").upsert(
         {
           user_id: user.id,
           diets: selectedDiets,
-          meal_timings: selectedTimings,
+          timings: selectedTimings,
           cook_time: cookTime,
           allergies: selectedAllergies,
         },

@@ -6,11 +6,14 @@ import { useAuth } from "@/lib/user/auth-context";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 
 interface UserPrefs {
-  goal?: string;
+  fitness_goal?: string;
+  daily_calorie_target?: number;
   workout_types?: string[];
   workout_days?: string;
+  workout_duration?: string;
   diets?: string[];
-  meal_timings?: string[];
+  timings?: string[];
+  cook_time?: string;
   allergies?: string[];
 }
 
@@ -20,6 +23,7 @@ export default function SettingsPage() {
   const [prefs, setPrefs] = useState<UserPrefs>({});
   const [tier, setTier] = useState<string>("free");
   const [signingOut, setSigningOut] = useState(false);
+
 
   useEffect(() => {
     if (!user) return;
@@ -31,16 +35,22 @@ export default function SettingsPage() {
     try {
       const supabase = getSupabaseBrowser();
 
-      const [goalsRes, mealsRes, quotaRes] = await Promise.all([
+      const [goalsRes, mealPrefsRes, workoutRes, quotaRes] = await Promise.all([
         supabase
           .from("user_goals")
-          .select("*")
+          .select("fitness_goal, daily_calorie_target")
           .eq("user_id", user!.id)
           .limit(1)
           .maybeSingle(),
         supabase
           .from("meal_prefs")
-          .select("*")
+          .select("diets, timings, cook_time, allergies")
+          .eq("user_id", user!.id)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("workout_prefs")
+          .select("types, days, duration")
           .eq("user_id", user!.id)
           .limit(1)
           .maybeSingle(),
@@ -48,12 +58,15 @@ export default function SettingsPage() {
       ]);
 
       setPrefs({
-        goal: goalsRes.data?.goal,
-        workout_types: goalsRes.data?.workout_types,
-        workout_days: goalsRes.data?.workout_days,
-        diets: mealsRes.data?.diets,
-        meal_timings: mealsRes.data?.meal_timings,
-        allergies: mealsRes.data?.allergies,
+        fitness_goal: goalsRes.data?.fitness_goal,
+        daily_calorie_target: goalsRes.data?.daily_calorie_target,
+        workout_types: workoutRes.data?.types,
+        workout_days: workoutRes.data?.days,
+        workout_duration: workoutRes.data?.duration,
+        diets: mealPrefsRes.data?.diets,
+        timings: mealPrefsRes.data?.timings,
+        cook_time: mealPrefsRes.data?.cook_time,
+        allergies: mealPrefsRes.data?.allergies,
       });
       setTier(quotaRes?.tier || "free");
     } catch (err) {
@@ -66,6 +79,7 @@ export default function SettingsPage() {
     await signOut();
     router.replace("/app/signin");
   }
+
 
   const initials =
     user?.user_metadata?.full_name
@@ -114,22 +128,33 @@ export default function SettingsPage() {
         </div>
       </div>
 
+
       {/* Preferences */}
       <div className="glass-card p-5">
         <h3 className="mb-4 text-sm font-medium text-white/70">Preferences</h3>
 
         <div className="flex flex-col gap-3">
           {/* Goal */}
-          {prefs.goal && (
+          {prefs.fitness_goal && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/55">Goal</span>
               <span className="text-sm capitalize text-white">
-                {prefs.goal.replace("_", " ")}
+                {prefs.fitness_goal.replace(/_/g, " ")}
               </span>
             </div>
           )}
 
-          {/* Workout */}
+          {/* Calorie Target */}
+          {prefs.daily_calorie_target && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-white/55">Daily Calories</span>
+              <span className="text-sm text-white">
+                {prefs.daily_calorie_target} kcal
+              </span>
+            </div>
+          )}
+
+          {/* Workout Types */}
           {prefs.workout_types && prefs.workout_types.length > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/55">Workouts</span>
@@ -140,10 +165,19 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Workout Frequency */}
           {prefs.workout_days && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/55">Frequency</span>
               <span className="text-sm text-white">{prefs.workout_days}</span>
+            </div>
+          )}
+
+          {/* Workout Duration */}
+          {prefs.workout_duration && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-white/55">Duration</span>
+              <span className="text-sm text-white">{prefs.workout_duration}</span>
             </div>
           )}
 
@@ -158,13 +192,21 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Meals */}
-          {prefs.meal_timings && prefs.meal_timings.length > 0 && (
+          {/* Meal Timings */}
+          {prefs.timings && prefs.timings.length > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/55">Meals</span>
               <span className="text-sm capitalize text-white">
-                {prefs.meal_timings.join(", ")}
+                {prefs.timings.join(", ")}
               </span>
+            </div>
+          )}
+
+          {/* Cook Time */}
+          {prefs.cook_time && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-white/55">Cook time</span>
+              <span className="text-sm text-white">{prefs.cook_time}</span>
             </div>
           )}
 
@@ -179,6 +221,7 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
 
       {/* Sign Out */}
       <button

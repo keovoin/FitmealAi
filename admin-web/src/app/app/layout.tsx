@@ -134,24 +134,13 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     pathname?.startsWith("/app/signin") || pathname?.startsWith("/app/onboarding");
 
   return (
-    <>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#7C3AED" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="black-translucent"
-        />
-      </head>
-      <AuthProvider>
-        <AuthGuard>
-          <main className="mx-auto min-h-screen w-full max-w-lg px-4 pb-20 pt-6">
-            {children}
-          </main>
-          {!hideNav && <BottomNav />}
-        </AuthGuard>
-      </AuthProvider>
-    </>
+    <AuthProvider>
+      <AuthGuard>
+        <main className="mx-auto min-h-screen w-full max-w-lg px-4 pb-20 pt-6">
+          {children}
+        </main>
+        {!hideNav && <BottomNav />}
+      </AuthGuard>
+    </AuthProvider>
   );
 }

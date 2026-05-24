@@ -6,20 +6,19 @@ import { useAuth } from "@/lib/user/auth-context";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 
 interface QuotaData {
-  remaining: number;
-  total: number;
   tier: string;
+  ai: { used: number; limit: number; unlimited: boolean };
+  shuffles: { used: number; limit: number; unlimited: boolean };
+  shuffle_meal_count: number;
 }
 
 interface MealSummary {
-  type: string;
+  meal_type: string;
   title: string;
   calories: number;
-}
-
-interface DayPlan {
-  meals: MealSummary[];
-  totals: { calories: number; protein: number; carbs: number; fat: number };
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
 }
 
 function CalorieRing({
@@ -34,7 +33,6 @@ function CalorieRing({
 
   return (
     <div className="glass-card flex items-center gap-5 p-5">
-      {/* Ring */}
       <div className="relative flex h-24 w-24 flex-shrink-0 items-center justify-center">
         <svg className="h-24 w-24 -rotate-90" viewBox="0 0 96 96">
           <circle
@@ -45,6 +43,7 @@ function CalorieRing({
             stroke="rgba(255,255,255,0.08)"
             strokeWidth="8"
           />
+
           <circle
             cx="48"
             cy="48"
@@ -67,8 +66,6 @@ function CalorieRing({
           <span className="block text-[10px] text-white/55">kcal</span>
         </div>
       </div>
-
-      {/* Info */}
       <div className="flex flex-col gap-1">
         <span className="text-sm text-white/55">Daily goal</span>
         <span className="text-lg font-semibold text-white">
@@ -81,6 +78,7 @@ function CalorieRing({
     </div>
   );
 }
+
 
 function MealsSummaryCard({ meals }: { meals: MealSummary[] }) {
   const router = useRouter();
@@ -108,7 +106,7 @@ function MealsSummaryCard({ meals }: { meals: MealSummary[] }) {
           <div key={i} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase text-accent-purple">
-                {meal.type}
+                {meal.meal_type}
               </span>
               <span className="text-sm text-white">{meal.title}</span>
             </div>
@@ -118,12 +116,13 @@ function MealsSummaryCard({ meals }: { meals: MealSummary[] }) {
       </div>
       {meals.length > 3 && (
         <p className="mt-2 text-xs text-accent-blue">
-          +{meals.length - 3} more →
+          +{meals.length - 3} more
         </p>
       )}
     </button>
   );
 }
+
 
 function UpgradeBanner() {
   const router = useRouter();
@@ -133,7 +132,7 @@ function UpgradeBanner() {
       className="w-full rounded-card border border-gold-start/40 bg-gradient-to-r from-gold-start/10 to-gold-end/10 p-4 text-left transition-colors hover:from-gold-start/15 hover:to-gold-end/15"
     >
       <div className="flex items-center gap-3">
-        <span className="text-2xl">✨</span>
+        <span className="text-2xl">&#10024;</span>
         <div>
           <p className="text-sm font-semibold text-white">
             Unlock unlimited meals
@@ -172,10 +171,12 @@ function LoadingSkeleton() {
   );
 }
 
+
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [quota, setQuota] = useState<QuotaData | null>(null);
-  const [plan, setPlan] = useState<DayPlan | null>(null);
+  const [meals, setMeals] = useState<MealSummary[]>([]);
+  const [calorieGoal, setCalorieGoal] = useState(2000);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const router = useRouter();
@@ -194,12 +195,26 @@ export default function HomePage() {
 
   async function fetchData() {
     try {
-      const [quotaRes, planData] = await Promise.all([
+      const supabase = getSupabaseBrowser();
+
+      const [quotaRes, goalsRes] = await Promise.all([
         fetch(`/api/quotas?user_id=${user!.id}`).then((r) => r.json()),
-        fetchTodayPlan(),
+        supabase
+          .from("user_goals")
+          .select("daily_calorie_target")
+          .eq("user_id", user!.id)
+          .limit(1)
+          .maybeSingle(),
       ]);
+
       setQuota(quotaRes);
-      setPlan(planData);
+      if (goalsRes.data?.daily_calorie_target) {
+        setCalorieGoal(goalsRes.data.daily_calorie_target);
+      }
+
+      // Fetch today's meal plan
+      const todayMeals = await fetchTodayPlan(supabase);
+      setMeals(todayMeals);
     } catch (err) {
       console.error("Failed to fetch home data:", err);
     } finally {
@@ -207,34 +222,90 @@ export default function HomePage() {
     }
   }
 
-  async function fetchTodayPlan(): Promise<DayPlan | null> {
-    const supabase = getSupabaseBrowser();
+
+  async function fetchTodayPlan(supabase: ReturnType<typeof getSupabaseBrowser>): Promise<MealSummary[]> {
     const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
+
+    // Get the active meal plan for today (not superseded)
+    const { data: planData } = await supabase
       .from("meal_plans")
-      .select("*")
+      .select("id")
       .eq("user_id", user!.id)
-      .eq("date", today)
+      .eq("plan_date", today)
+      .is("superseded_at", null)
       .limit(1)
       .maybeSingle();
 
-    if (!data) return null;
+    if (!planData) return [];
 
-    return {
-      meals: data.meals || [],
-      totals: data.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    };
+    // Get meal_plan_items joined with meals
+    const { data: items } = await supabase
+      .from("meal_plan_items")
+      .select("position, calories, protein_g, carbs_g, fat_g, meals(title, meal_type)")
+      .eq("meal_plan_id", planData.id)
+      .order("position", { ascending: true });
+
+    if (!items || items.length === 0) return [];
+
+    return items.map((item: Record<string, unknown>) => {
+      const meal = item.meals as Record<string, unknown> | null;
+      return {
+        meal_type: (meal?.meal_type as string) || "meal",
+        title: (meal?.title as string) || "Untitled",
+        calories: (item.calories as number) || 0,
+        protein_g: (item.protein_g as number) || 0,
+        carbs_g: (item.carbs_g as number) || 0,
+        fat_g: (item.fat_g as number) || 0,
+      };
+    });
   }
 
+
   async function handleGenerate() {
-    if (!user) return;
+    if (!user || !session) return;
     setGenerating(true);
     try {
+      const supabase = getSupabaseBrowser();
+
+      // Get user preferences to build the full request body
+      const [goalsRes, mealPrefsRes] = await Promise.all([
+        supabase
+          .from("user_goals")
+          .select("fitness_goal, daily_calorie_target")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("meal_prefs")
+          .select("diets, timings, cook_time, allergies")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const body = {
+        user_id: user.id,
+        goal: goalsRes.data?.fitness_goal || "stay_fit",
+        daily_calorie_target: goalsRes.data?.daily_calorie_target || 2000,
+        diets: mealPrefsRes.data?.diets || ["balanced"],
+        allergies: mealPrefsRes.data?.allergies || [],
+        cook_time: mealPrefsRes.data?.cook_time || "30 min",
+        meal_types: mealPrefsRes.data?.timings || ["breakfast", "lunch", "dinner"],
+        date: today,
+        reuse_today_if_present: true,
+      };
+
       const res = await fetch("/api/ai/meal-plan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(body),
       });
+
       if (!res.ok) throw new Error("Generation failed");
       await fetchData();
     } catch (err) {
@@ -244,10 +315,15 @@ export default function HomePage() {
     }
   }
 
+
   if (loading) return <LoadingSkeleton />;
 
-  const consumed = plan?.totals.calories || 0;
-  const calorieGoal = 2200; // Could come from user_goals
+  const consumed = meals.reduce((sum, m) => sum + m.calories, 0);
+  const aiRemaining = quota?.ai.unlimited
+    ? "Unlimited"
+    : quota
+      ? `${Math.max(quota.ai.limit - quota.ai.used, 0)} left`
+      : "";
 
   return (
     <div className="flex flex-col gap-5">
@@ -269,7 +345,7 @@ export default function HomePage() {
       <CalorieRing consumed={consumed} goal={calorieGoal} />
 
       {/* Today's Meals */}
-      <MealsSummaryCard meals={plan?.meals || []} />
+      <MealsSummaryCard meals={meals} />
 
       {/* Upgrade Banner for Free users */}
       {quota?.tier === "free" && <UpgradeBanner />}
@@ -277,12 +353,10 @@ export default function HomePage() {
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={generating || (quota?.remaining === 0)}
+        disabled={generating || (!quota?.ai.unlimited && quota?.ai.used === quota?.ai.limit)}
         className="w-full rounded-xl bg-primary-gradient py-3.5 font-semibold text-white shadow-glow transition-opacity disabled:opacity-40"
       >
-        {generating
-          ? "Generating..."
-          : `Generate ${quota ? `(${quota.remaining} left)` : ""}`}
+        {generating ? "Generating..." : `Generate ${aiRemaining ? `(${aiRemaining})` : ""}`}
       </button>
     </div>
   );
