@@ -179,6 +179,7 @@ export default function HomePage() {
   const [calorieGoal, setCalorieGoal] = useState(2000);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const greeting = getGreeting();
@@ -262,10 +263,18 @@ export default function HomePage() {
 
 
   async function handleGenerate() {
-    if (!user || !session) return;
+    if (!user) return;
     setGenerating(true);
+    setError(null);
     try {
       const supabase = getSupabaseBrowser();
+
+      // Always get a fresh session token
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      if (!freshSession?.access_token) {
+        setError("Not signed in. Please sign out and sign in again.");
+        return;
+      }
 
       // Get user preferences to build the full request body
       const [goalsRes, mealPrefsRes] = await Promise.all([
@@ -287,29 +296,47 @@ export default function HomePage() {
 
       const body = {
         user_id: user.id,
-        goal: goalsRes.data?.fitness_goal || "stay_fit",
+        goal: goalsRes.data?.fitness_goal || "eat_healthier",
         daily_calorie_target: goalsRes.data?.daily_calorie_target || 2000,
-        diets: mealPrefsRes.data?.diets || ["balanced"],
+        diets: mealPrefsRes.data?.diets?.length ? mealPrefsRes.data.diets : ["balanced"],
         allergies: mealPrefsRes.data?.allergies || [],
         cook_time: mealPrefsRes.data?.cook_time || "30 min",
-        meal_types: mealPrefsRes.data?.timings || ["breakfast", "lunch", "dinner"],
+        meal_types: mealPrefsRes.data?.timings?.length ? mealPrefsRes.data.timings : ["breakfast", "lunch", "dinner"],
         date: today,
-        reuse_today_if_present: true,
+        reuse_today_if_present: false,
       };
 
       const res = await fetch("/api/ai/meal-plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${freshSession.access_token}`,
         },
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error("Generation failed");
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        const msg = data.error || data.reason || "Generation failed";
+        if (msg === "ai_not_configured") {
+          setError("AI is not configured. Ask the admin to set up OpenAI or Kiro AI keys.");
+        } else if (msg === "daily_cap_reached") {
+          setError("You've used all your AI generations for today. Try again tomorrow or upgrade.");
+        } else if (msg === "global_budget_reached") {
+          setError("The AI budget limit has been reached. Please try again tomorrow.");
+        } else if (msg.includes("rate_limit") || msg.includes("profile_not_found")) {
+          setError("Account setup incomplete. Go to Settings to complete your profile.");
+        } else {
+          setError(msg);
+        }
+        return;
+      }
+
+      // Success! Refresh data
       await fetchData();
     } catch (err) {
       console.error("Generate error:", err);
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
       setGenerating(false);
     }
@@ -350,11 +377,18 @@ export default function HomePage() {
       {/* Upgrade Banner for Free users */}
       {quota?.tier === "free" && <UpgradeBanner />}
 
+      {/* Error Message */}
+      {error && (
+        <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {error}
+        </div>
+      )}
+
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
         disabled={generating || (!quota?.ai.unlimited && quota?.ai.used === quota?.ai.limit)}
-        className="w-full rounded-xl bg-primary-gradient py-3.5 font-semibold text-white shadow-glow transition-opacity disabled:opacity-40"
+        className="w-full rounded-xl bg-primary-gradient py-3.5 font-semibold text-white shadow-glow transition-all active:scale-[0.97] disabled:opacity-40"
       >
         {generating ? "Generating..." : `Generate ${aiRemaining ? `(${aiRemaining})` : ""}`}
       </button>

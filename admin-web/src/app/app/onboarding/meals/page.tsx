@@ -94,6 +94,18 @@ export default function OnboardingMealsPage() {
         { onConflict: "user_id" },
       );
 
+      // Ensure profile exists (trigger should create it, but belt+suspenders)
+      await supabase.from("profiles").upsert(
+        {
+          id: user.id,
+          email: user.email || "",
+          display_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+          tier: "free",
+          status: "active",
+        },
+        { onConflict: "id" },
+      );
+
       // Save to workout_prefs table (PK: user_id)
       await supabase.from("workout_prefs").upsert(
         {

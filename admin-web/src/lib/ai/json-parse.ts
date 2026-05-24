@@ -40,6 +40,12 @@ const ENVELOPE_KEYS: readonly string[] = [
   "result",
   "output",
   "response",
+  "generated_recipe",
+  "generatedRecipe",
+  "recipes",
+  "meals",
+  "content",
+  "choices",
 ];
 
 /**
@@ -86,11 +92,23 @@ export function parseWithEnvelope<T>(
   const direct = schema.safeParse(obj);
   if (direct.success) return direct.data;
 
+  // If the model returned an array with one item, try that item
+  if (Array.isArray(obj) && obj.length === 1) {
+    const arrResult = schema.safeParse(obj[0]);
+    if (arrResult.success) return arrResult.data;
+  }
+
   if (obj && typeof obj === "object" && !Array.isArray(obj)) {
     const record = obj as Record<string, unknown>;
     for (const key of ENVELOPE_KEYS) {
       if (key in record) {
-        const peeled = schema.safeParse(record[key]);
+        const inner = record[key];
+        // Handle array-wrapped envelopes: {"recipes": [{...}]}
+        if (Array.isArray(inner) && inner.length > 0) {
+          const peeled = schema.safeParse(inner[0]);
+          if (peeled.success) return peeled.data;
+        }
+        const peeled = schema.safeParse(inner);
         if (peeled.success) return peeled.data;
       }
     }
@@ -102,8 +120,21 @@ export function parseWithEnvelope<T>(
     const keys = Object.keys(record);
     if (keys.length === 1) {
       const onlyValue = record[keys[0]];
+      if (Array.isArray(onlyValue) && onlyValue.length > 0) {
+        const peeled = schema.safeParse(onlyValue[0]);
+        if (peeled.success) return peeled.data;
+      }
       if (onlyValue && typeof onlyValue === "object") {
         const peeled = schema.safeParse(onlyValue);
+        if (peeled.success) return peeled.data;
+      }
+    }
+
+    // Deep-dive: try every value in the object that is itself an object
+    for (const key of Object.keys(record)) {
+      const val = record[key];
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        const peeled = schema.safeParse(val);
         if (peeled.success) return peeled.data;
       }
     }

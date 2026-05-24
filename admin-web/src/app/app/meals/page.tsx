@@ -171,6 +171,7 @@ export default function MealsPage() {
   const [totals, setTotals] = useState<DayTotals>({ calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;

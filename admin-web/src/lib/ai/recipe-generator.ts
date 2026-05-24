@@ -48,29 +48,29 @@ import {
 
 const IngredientSchema = z.object({
   name: z.string().min(1).max(80),
-  grams: z.number().int().min(1).max(2000),
-  calories: z.number().int().min(0).max(3000),
-  protein_g: z.number().int().min(0).max(300),
-  carbs_g: z.number().int().min(0).max(300),
-  fat_g: z.number().int().min(0).max(300),
-});
+  grams: z.coerce.number().int().min(0).max(2000),
+  calories: z.coerce.number().int().min(0).max(3000),
+  protein_g: z.coerce.number().int().min(0).max(300),
+  carbs_g: z.coerce.number().int().min(0).max(300),
+  fat_g: z.coerce.number().int().min(0).max(300),
+}).passthrough();
 
 const GeneratedRecipeSchema = z.object({
   title: z.string().min(2).max(120),
   description: z.string().max(280).optional(),
   meal_type: z.enum(["breakfast", "lunch", "dinner", "snack"]),
-  cook_time_minutes: z.number().int().min(1).max(240).optional(),
+  cook_time_minutes: z.coerce.number().int().min(1).max(240).optional(),
   diets: z.array(z.string().min(1).max(40)).max(8),
   allergens: z.array(z.string().min(1).max(40)).max(20),
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
-  calories: z.number().int().min(50).max(2500),
-  protein_g: z.number().int().min(0).max(250),
-  carbs_g: z.number().int().min(0).max(300),
-  fat_g: z.number().int().min(0).max(200),
+  calories: z.coerce.number().int().min(50).max(2500),
+  protein_g: z.coerce.number().int().min(0).max(250),
+  carbs_g: z.coerce.number().int().min(0).max(300),
+  fat_g: z.coerce.number().int().min(0).max(200),
   ingredients: z.array(IngredientSchema).min(2).max(15),
   recipe_steps: z.array(z.string().min(4).max(400)).min(2).max(12),
   image_prompt: z.string().min(8).max(280),
-});
+}).passthrough();
 
 type GeneratedRecipe = z.infer<typeof GeneratedRecipeSchema>;
 
@@ -111,6 +111,68 @@ export type GenerateRecipeOutcome =
 // -----------------------------------------------------------------------------
 // Entry point
 // -----------------------------------------------------------------------------
+
+/**
+ * Normalize field aliases the model might use instead of our expected names.
+ * Applied recursively to handle nested envelopes.
+ */
+function normalizeRecipeFields(obj: unknown): unknown {
+  if (!obj || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(normalizeRecipeFields);
+
+  const r = obj as Record<string, unknown>;
+  const result: Record<string, unknown> = { ...r };
+
+  // Recipe-level aliases
+  if (!result.meal_type && result.mealType) result.meal_type = result.mealType;
+  if (!result.cook_time_minutes && result.cookTime) {
+    const n = parseInt(String(result.cookTime), 10);
+    if (n > 0) result.cook_time_minutes = n;
+  }
+  if (!result.cook_time_minutes && result.cook_time) {
+    const n = parseInt(String(result.cook_time), 10);
+    if (n > 0) result.cook_time_minutes = n;
+  }
+  if (!result.recipe_steps && result.steps) result.recipe_steps = result.steps;
+  if (!result.recipe_steps && result.recipeSteps) result.recipe_steps = result.recipeSteps;
+  if (!result.recipe_steps && result.instructions) result.recipe_steps = result.instructions;
+  if (!result.image_prompt && result.imagePrompt) result.image_prompt = result.imagePrompt;
+  if (!result.protein_g && result.protein) result.protein_g = result.protein;
+  if (!result.carbs_g && result.carbs) result.carbs_g = result.carbs;
+  if (!result.fat_g && result.fat) result.fat_g = result.fat;
+
+  // Normalize ingredients if present
+  if (Array.isArray(result.ingredients)) {
+    result.ingredients = (result.ingredients as Record<string, unknown>[]).map((ing) => {
+      const i = { ...ing };
+      if (!i.name && i.ingredient) i.name = i.ingredient;
+      if (!i.grams && i.weight_g) i.grams = i.weight_g;
+      if (!i.grams && i.amount_g) i.grams = i.amount_g;
+      if (!i.grams && i.weight) i.grams = i.weight;
+      if (!i.protein_g && i.protein) i.protein_g = i.protein;
+      if (!i.carbs_g && i.carbs) i.carbs_g = i.carbs;
+      if (!i.fat_g && i.fat) i.fat_g = i.fat;
+      // Coerce string numbers like "150g" → 150
+      for (const key of ["grams", "calories", "protein_g", "carbs_g", "fat_g"]) {
+        if (typeof i[key] === "string") {
+          i[key] = parseInt(String(i[key]).replace(/[^0-9.-]/g, ""), 10) || 0;
+        }
+      }
+      return i;
+    });
+  }
+
+  // Normalize nested envelope values too
+  for (const key of Object.keys(result)) {
+    const val = result[key];
+    if (val && typeof val === "object" && !Array.isArray(val) && key !== "ingredients") {
+      // Don't recurse into arrays or already-processed ingredients
+      result[key] = normalizeRecipeFields(val);
+    }
+  }
+
+  return result;
+}
 
 export async function generateRecipeForAdmin(
   opts: GenerateRecipeOptions,
@@ -180,7 +242,9 @@ export async function generateRecipeForAdmin(
     // the flat object the prompt asks for, which used to surface as
     // a confusing "title: undefined" zod error. parseWithEnvelope
     // peels common wrapper keys before validating.
-    parsed = parseWithEnvelope(GeneratedRecipeSchema, parseLooseJson(raw));
+    const looseParsed = parseLooseJson(raw);
+    const normalized = normalizeRecipeFields(looseParsed);
+    parsed = parseWithEnvelope(GeneratedRecipeSchema, normalized);
   } catch (err) {
     await logFailure(
       opts.adminUserId,
