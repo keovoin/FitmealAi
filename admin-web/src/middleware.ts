@@ -8,6 +8,9 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/login",
   "/api/logout",
+  // User-facing web app uses Supabase auth (not admin cookie).
+  // The /app layout handles its own auth guard client-side.
+  "/app",
   // Mobile/API routes validate Supabase JWTs in their own handlers.
   // Adding them to PUBLIC_PATHS here lets the iOS/Android apps call
   // them without an admin cookie. Each route still 503s if Supabase
@@ -36,9 +39,24 @@ const PUBLIC_PATHS = [
  *   - Middleware runs on the Edge runtime which doesn't expose Node's
  *     `crypto.timingSafeEqual` reliably
  *   - We want the same secret material in one place (lib/auth.ts)
+ *
+ * Domain routing: if USER_DOMAIN env var is set, requests to that domain
+ * arriving at "/" are redirected to "/app/home" so users land on the
+ * web app, not the admin portal.
  */
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Domain-based routing: redirect user domain root to /app/signin
+  const userDomain = process.env.USER_DOMAIN;
+  if (userDomain && req.headers.get("host")?.includes(userDomain)) {
+    if (pathname === "/") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/app/signin";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
